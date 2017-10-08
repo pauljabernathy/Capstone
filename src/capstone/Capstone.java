@@ -128,9 +128,9 @@ public class Capstone {
         return result;
     }
     
-    //unfinished, doing getWordPairs instead
+    //unfinished, doing getWordPairSeparationss instead
     //TODO:  remove?
-    public static Optional<WordPairSeparation> getWordPair(String text, int separation) {
+    public static Optional<WordPairSeparation> getWordPairSeparation(String text, int separation) {
         WordPairSeparation pair = null;
 	if(text == null) {
             return Optional.ofNullable(null);
@@ -140,7 +140,7 @@ public class Capstone {
         return Optional.ofNullable(pair);
     }
     
-    public static Optional<List<WordPairSeparation>> getWordPairs(String text) {
+    public static Optional<List<WordPairSeparation>> getWordPairSeparationss(String text) {
         if(text == null || text.isEmpty()) {
             return Optional.ofNullable(null);
         }
@@ -158,12 +158,12 @@ public class Capstone {
         return Optional.ofNullable(pairs);
     }
     
-    public static List<WordPairSeparation> getWordPairsFromFile(String filename) throws IOException {
+    public static List<WordPairSeparation> getWordPairSeparationsFromFile(String filename) throws IOException {
         List<String> sentences = readSentecesFromFile(filename);
         List<WordPairSeparation> pairs = new ArrayList<>();
         Optional<List<WordPairSeparation>> current = null;
         for(String sentence : sentences) {
-            current = getWordPairs(sentence);
+            current = getWordPairSeparationss(sentence);
             if(current.isPresent()) {
                 pairs.addAll(current.get());
             }
@@ -171,9 +171,9 @@ public class Capstone {
         return pairs;
     }
     
-    public static Map<Integer, TreeHistogram<WordPairSeparation>> getWordPairHistogramsFromFile(String filename) throws IOException {
+    public static Map<Integer, TreeHistogram<WordPairSeparation>> getWordPairSepHistogramsFromFile(String filename) throws IOException {
         Map<Integer, TreeHistogram<WordPairSeparation>> map = new HashMap();
-        List<WordPairSeparation> wordPairs = getWordPairsFromFile(filename);
+        List<WordPairSeparation> wordPairs = getWordPairSeparationsFromFile(filename);
         //if(wordPairs.isPresent()) {
         for(WordPairSeparation wp : wordPairs) {
             //wordPairs.stream().forEach(wp -> map.get(wp.separation).insert(wp, 1));
@@ -263,7 +263,7 @@ public class Capstone {
                         Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
                         String filename = args[1];
                         try {
-                            result = Capstone.getWordPairHistogramsFromFile(filename);
+                            result = Capstone.getWordPairSepHistogramsFromFile(filename);
                             System.out.println(result);
                         }
                         catch(IOException e) {

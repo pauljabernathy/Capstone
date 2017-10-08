@@ -152,20 +152,20 @@ public class CapstoneTest {
     }
     
     @Test
-    public void testGetWordPair() {
-        logger.info("\ntesting getWordPair()");
+    public void testGetWordPairSeparation() {
+        logger.info("\ntesting getWordPairSeparation()");
         Optional<WordPairSeparation> result = null;// Optional.of(null);
         String text = null;
-        result = Capstone.getWordPair(text, 1);
+        result = Capstone.getWordPairSeparation(text, 1);
         if(result == null) {
-            fail("result of getWordPair(null, 1) should not have been null");
+            fail("result of getWordPairSeparation(null, 1) should not have been null");
         }
         logger.debug(result);
         
         text = "";
-        result = Capstone.getWordPair(text, 1);
+        result = Capstone.getWordPairSeparation(text, 1);
         if(result == null) {
-            fail("result of getWordPair(<empty>, 1) should not have been null");
+            fail("result of getWordPairSeparation(<empty>, 1) should not have been null");
         }
         logger.debug(result);
         
@@ -173,28 +173,28 @@ public class CapstoneTest {
     
     @Test
     public void testGetWordPairs() {
-        logger.info("\ntesting getWordPairs()");
+        logger.info("\ntesting getWordPairSeparations()");
         Optional<List<WordPairSeparation>> result = null;
-        result = Capstone.getWordPairs(null);
+        result = Capstone.getWordPairSeparationss(null);
         if(result == null) {
-            fail("null result for getWordPairs(null)");
+            fail("null result for getWordPairSeparations(null)");
         }
         assertEquals(false, result.isPresent());
         
-        result = Capstone.getWordPairs("");
+        result = Capstone.getWordPairSeparationss("");
         if(result == null) {
-            fail("null result for getWordPairs(\"\")");
+            fail("null result for getWordPairSeparations(\"\")");
         }
         assertEquals(false, result.isPresent());
         
         
         String text = "one two three four";
-        result = Capstone.getWordPairs(text);
+        result = Capstone.getWordPairSeparationss(text);
         assertEquals(6, result.get().size());
         result.get().stream().forEach(System.out::println);
         
         text = "one two three four five six";
-        result = Capstone.getWordPairs(text);
+        result = Capstone.getWordPairSeparationss(text);
         assertEquals(15, result.get().size());
     }
     
@@ -213,18 +213,18 @@ public class CapstoneTest {
     }
     
     @Test
-    public void testGetWordPairsFromFile() {
-        logger.info("\ntesting getWordPairsFromFile()");
+    public void testGetWordPairSeparationsFromFile() {
+        logger.info("\ntesting getWordPairSeparationsFromFile()");
         //Optional<List<WordPair>> result = null;
         List<WordPairSeparation> result = null;
         String filename = "word_pair_test1.txt";
-        testGetWordPairsFromOneFile(filename, 6);
-        result = testGetWordPairsFromOneFile("word_pair_test2.txt", 19);
+        testGetWordPairSeparationsFromOneFile(filename, 6);
+        result = testGetWordPairSeparationsFromOneFile("word_pair_test2.txt", 19);
         result.stream().filter(wp -> wp.ending.equals("four")).forEach(System.out::println);
         
         filename = "sentenceSample1.txt";
         try {
-            result = Capstone.getWordPairsFromFile(filename);
+            result = Capstone.getWordPairSeparationsFromFile(filename);
             //result.get().stream().filter(wp -> wp.ending.equals("the")).forEach(System.out::println);
             //result.get().stream().filter(wp -> wp.preceeding.equals("the")).forEach(System.out::println);
             logger.debug(result.stream().filter(wp -> wp.ending.equals("the") && wp.separation == 6).count());
@@ -234,11 +234,11 @@ public class CapstoneTest {
         }
     }
     
-    private List<WordPairSeparation> testGetWordPairsFromOneFile(String filename, int expectedCount) {
+    private List<WordPairSeparation> testGetWordPairSeparationsFromOneFile(String filename, int expectedCount) {
         System.out.println();
         List<WordPairSeparation> result = null;
         try {
-            result = Capstone.getWordPairsFromFile(filename);
+            result = Capstone.getWordPairSeparationsFromFile(filename);
             //result.get().stream().forEach(System.out::println);
             assertEquals(expectedCount, result.size());
         } catch(IOException e) {
@@ -248,10 +248,10 @@ public class CapstoneTest {
     }
     
     @Test
-    public void testGetWordPairHistogramsFromFile() {
-        logger.info("\ntesting getWordPairHistogramsFromFile()");
+    public void testGetWordPairSepHistogramsFromFile() {
+        logger.info("\ntesting getWordPairSepHistogramsFromFile()");
         Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
-        result = testGetWordPairHistogramsFromOneFile("word_pair_test1.txt", 3);
+        result = testGetWordPairSepHistogramsFromOneFile("word_pair_test1.txt", 3);
         TreeHistogram th = result.get(1);
         logger.debug(th.getAsList());
         assertEquals(3, th.getTotalCount());
@@ -262,7 +262,7 @@ public class CapstoneTest {
         logger.debug(th.getAsList());
         assertEquals(1, th.getTotalCount());
         
-        result = testGetWordPairHistogramsFromOneFile("word_pair_test2.txt", 5);
+        result = testGetWordPairSepHistogramsFromOneFile("word_pair_test2.txt", 5);
         logger.debug(result.get(1).getAsList(toolbox.stats.TreeHistogram.Sort.ITEM));
         logger.debug(result.get(2).getAsList(toolbox.stats.TreeHistogram.Sort.ITEM));
         logger.debug(result.get(3).getAsList(toolbox.stats.TreeHistogram.Sort.ITEM));
@@ -271,12 +271,12 @@ public class CapstoneTest {
     }
     
     @Test
-    public void testGetWordPairHistogramsFromLargeFile() {
-        logger.info("\ntesting getWordPairHistogramsFromFile(), from one of the larger data files");
+    public void testGetWordPairSepHistogramsFromLargeFile() {
+        logger.info("\ntesting getWordPairSepHistogramsFromFile(), from one of the larger data files");
         Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
         String filename = "blogsSample1.txt";
         try {
-            result = Capstone.getWordPairHistogramsFromFile(filename);
+            result = Capstone.getWordPairSepHistogramsFromFile(filename);
             logger.info(result.size());
             logger.info(result.get(1).getTotalCount());
             logger.info(result.get(2).getTotalCount());
@@ -288,11 +288,11 @@ public class CapstoneTest {
         }
     }
     
-    private Map<Integer, TreeHistogram<WordPairSeparation>> testGetWordPairHistogramsFromOneFile(String filename, int expectedCount) {
+    private Map<Integer, TreeHistogram<WordPairSeparation>> testGetWordPairSepHistogramsFromOneFile(String filename, int expectedCount) {
         System.out.println();
         Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
         try {
-            result = Capstone.getWordPairHistogramsFromFile(filename);
+            result = Capstone.getWordPairSepHistogramsFromFile(filename);
             //result.get().stream().forEach(System.out::println);
             assertEquals(expectedCount, result.size());
         } catch(IOException e) {
