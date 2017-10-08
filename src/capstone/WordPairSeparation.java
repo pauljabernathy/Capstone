@@ -7,7 +7,9 @@
 package capstone;
 
 /**
- *
+ * The classes for word assocations and word separation both have two Strings and an int so I thought about combining them, but ended up
+ * creating separate classes to convey the separate uses - one to show how often words appear together, and the other to show how far apart
+ * in the same sentence they are.
  * @author paul
  */
 public class WordPairSeparation implements Comparable {

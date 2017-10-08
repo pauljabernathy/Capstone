@@ -34,6 +34,8 @@ public class WordMatrix {
 	this.reverse = new HashMap<String, Map<String, Integer>>();
     }
     
+    //TODO:  the ability to specifiy if things should be unique (don't add if it's already there)
+    //or if adding the same pair again should update the cound
     public WordMatrix add(String a, String b) {
 	if(a.compareTo(b) < 0) {
 	    this.addToMap(forward, a, b);
@@ -42,13 +44,18 @@ public class WordMatrix {
 	    this.addToMap(forward, b, a);
 	    this.addToMap(reverse, a, b);
 	}
-	//If a and b are the same, do nothing.
+	//If a and b are the same, do nothing because it should not be added.
 	return this;
     }
     
     public int get(String a, String b) {
-	//return this.getFromMap(this.forward, a, b);
-	return this.getFromMap(this.reverse, b, a);
+	if(a.compareTo(b) < 0) {
+	    return this.getFromMap(forward, a, b);
+	} else if(a.compareTo(b) > 0) {
+	    return this.getFromMap(reverse, a, b);
+	} else {
+	    return 0;
+	}
     }
     
     /**
@@ -89,7 +96,18 @@ public class WordMatrix {
 	}
     }
     
-    public List getAll(String word) {
-	return null;
+    public List<WordPairAssociation> getAll(String word) {
+	List<WordPairAssociation> result = new ArrayList<>();
+	if(forward.containsKey(word)) {
+	    for(String key : forward.get(word).keySet()) {
+		result.add(new WordPairAssociation(word, key, forward.get(word).get(key)));
+	    }
+	}
+	if(reverse.containsKey(word)) {
+	    for(String key : reverse.get(word).keySet()) {
+		result.add(new WordPairAssociation(word, key, reverse.get(word).get(key)));
+	    }
+	}
+	return result;
     }
 }
