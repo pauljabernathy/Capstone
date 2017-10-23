@@ -67,7 +67,7 @@ public class WordPairAssociation {
     public boolean equals(Object o) {
 	if(o instanceof WordPairAssociation) {
 	    WordPairAssociation other = (WordPairAssociation)o;
-	    return this.first.equals(other.first) && this.second.equals(other.second);
+	    return this.first.equals(other.first) && this.second.equals(other.second) && this.count == other.count;
 	} else {
 	    return false;
 	}

@@ -5,24 +5,26 @@
  */
 package capstone;
 
+import static capstone.Capstone.DEFAULT_BREAKS_BETWEEN_WORDS;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import static java.util.stream.Collectors.toList;
+import org.apache.logging.log4j.*;
 import org.junit.After;
 import org.junit.AfterClass;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
 import toolbox.stats.*;
-import java.util.Calendar;
-import org.apache.logging.log4j.*;
 import toolbox.util.ListArrayUtil;
-import java.util.Optional;
-import java.util.Map;
 
 /**
  *
@@ -38,7 +40,7 @@ public class CapstoneTest {
     
     @BeforeClass
     public static void setUpClass() {
-        instance = new Capstone();
+        //instance = new Capstone();
         logger = ListArrayUtil.getLogger(CapstoneTest.class, Level.INFO);
     }
     
@@ -79,38 +81,43 @@ public class CapstoneTest {
         logger.info("\ntesting readSentencesFromFile()");
         List<String> result = null;
         try {
-            assertEquals(0, Capstone.readSentecesFromFile(null).size());
+            assertEquals(0, Capstone.readSentencesFromFile(null).size());
             List<String> sentenceBreaks = Arrays.asList(".", "!", "?");
             String filename = "through_the_looking_glass.txt";
             filename = "sentenceSample1.txt";
-            List<String> sentences = Capstone.readSentecesFromFile(filename);
+            List<String> sentences = Capstone.readSentencesFromFile(filename);
             sentences.stream().limit(20).forEach(System.out::println);
             assertEquals(8, sentences.size());
             
             filename = "word_pair_test2.txt";
-            sentences = Capstone.readSentecesFromFile(filename);
+            sentences = Capstone.readSentencesFromFile(filename);
             sentences.stream().limit(20).forEach(System.out::println);
             assertEquals(3, sentences.size());
+	    
+	    filename = "word_pair_test1.txt";
+	    sentences = Capstone.readSentencesFromFile(filename);
+            sentences.stream().limit(20).forEach(System.out::println);
+            assertEquals(1, sentences.size());
         } catch(IOException e) {
             System.err.println(e.getClass() + " " + e.getMessage());
         }
     }
     
     @Test
-    public void testSplit() {
+    public void testTokenize() {
         logger.info("\ntesting split()");
         List<String> sentenceBreaks = Arrays.asList(".", "!", "?");
         String text = null;
         String [] splits = null;
 
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         if(splits == null) {
             fail("splits was null when it should have been empty but non null");
         }
         assertEquals(0, splits.length);
 
         text = "";
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         if(splits == null) {
             fail("splits was null when it should have been empty but non null");
         }
@@ -118,37 +125,43 @@ public class CapstoneTest {
         assertEquals(0, splits.length);
 
         text = "And then I said no.  But why?  How dumb was that!  oh well";
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         assertEquals(4, splits.length);
         Arrays.asList(splits).stream().forEach(s -> s = s.replace("\t", ""));
         Arrays.asList(splits).stream().forEach(System.out::println);
 
         text = "There is only one sentence here so ha.";
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         assertEquals(1, splits.length);
 
         text = "There is only one sentence here so ha";
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         assertEquals(1, splits.length);
 
         sentenceBreaks = null;
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         assertEquals(1, splits.length);
 
         sentenceBreaks = new ArrayList<>();
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         assertEquals(1, splits.length);
         
         sentenceBreaks = Arrays.asList(".", "!", "?");
         text = "We need to handle the elipsis correctly...  Yes we do.";
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         Arrays.asList(splits).stream().forEach(System.out::println);
         assertEquals(1, splits.length);
         
         text = "We need to handle the elipsis correctly....  Yes we do";
-        splits = Capstone.split(text, sentenceBreaks);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         Arrays.asList(splits).stream().forEach(System.out::println);
         assertEquals(2, splits.length);
+	
+	text = "one two threefour five";
+	sentenceBreaks = new ArrayList<>();
+	sentenceBreaks.add(" ");
+	splits = Capstone.tokenize(text, sentenceBreaks);
+	assertEquals(4, splits.length);
     }
     
     @Test
@@ -419,11 +432,27 @@ public class CapstoneTest {
         logger.info(result);  //getProbDist().toString());
     }
     
+    //TODO:  Do not use unit test files for actual processing, especially something that takes a long time!
     @Test
     public void testReadFileAsStrings() {
         logger.info("\ntesting readFileAsStrings()");
         List<String> result = null;
-        assertEquals(0, Capstone.readFileAsStrings(null, null).size());
+        //assertEquals(0, Capstone.readFileAsStrings(null, null).size());
+	Map<String, String> replacements = new HashMap<>();
+	replacements.put(":", "XYZ");
+	result = Capstone.readFileAsStrings("replacementTestFile1.txt", " ", replacements);
+	result.forEach(System.out::println);
+	assertTrue(result.contains("thisXYZ"));
+	assertFalse(result.contains(":"));
+	assertTrue(result.contains(","));
+	assertTrue(result.contains("clear,\""));
+	
+	result = Capstone.readFileAsStrings("replacementTestFile1.txt", " ");
+	assertFalse(result.contains("thisXYZ"));
+	assertFalse(result.contains(":"));
+	assertFalse(result.contains(","));
+	assertFalse(result.contains("clear,\""));
+	
         /*result = Capstone.readFileAsStrings("test1.txt", " ");
         assertEquals(5, result.size());
         result.stream().forEach(System.out::println);
@@ -460,7 +489,7 @@ public class CapstoneTest {
         result = Capstone.readFileAsStrings("/Users/pabernathy/coursera/datascience/final/en_US/en_US.twitter.txt", " ");
         System.out.println("en_US.twitter.txt:  " + result.size());/**/
         
-        result = Capstone.readFileAsStrings("/Users/pabernathy/twitterSample2.txt", " ");
+        /**result = Capstone.readFileAsStrings("/Users/pabernathy/twitterSample2.txt", " ");
         System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
         System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
         System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
@@ -470,7 +499,7 @@ public class CapstoneTest {
         System.out.println("for:  " + result.stream().filter(word -> word.equals("for")).count());
         
         System.out.println();
-        result = result.stream().map(n -> n.toLowerCase()).collect(Collectors.toList());
+        result = result.stream().map(n -> n.toLowerCase()).collect(Collectors.toList());/**/
         /*System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
         System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
         System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
@@ -506,7 +535,7 @@ public class CapstoneTest {
         System.out.println("a:  " + result.stream().filter(word -> word.equals(" ")).count());
         System.out.println("for:  " + result.stream().filter(word -> word.equals("that")).count());*/
         
-        System.out.println(showWordTotal(result, "the"));
+        /**System.out.println(showWordTotal(result, "the"));
         System.out.println(showWordTotal(result, "to"));
         System.out.println(showWordTotal(result, "i"));
         System.out.println(showWordTotal(result, "you"));
@@ -519,7 +548,7 @@ public class CapstoneTest {
         System.out.println(showWordTotal(result, " "));
         System.out.println(showWordTotal(result, "...in"));
         System.out.println(showWordTotal(result, "in."));
-        System.out.println(result.stream().distinct().count());
+        System.out.println(result.stream().distinct().count());/**/
     }
     
     public String showWordTotal(List<String> result, String word) {
@@ -610,5 +639,116 @@ public class CapstoneTest {
         System.out.println("time taken:  " + ((double)stopTime - (double)startTime)/1000.0);
         list.stream().limit(100).forEach(System.out::println);
         System.out.flush();
+    }
+    
+    @Test
+    public void testFindWordMatrixFromArray() {
+	logger.info("\ntesting getWordMatrix(String[] array)");
+	String[] input = null;
+	WordMatrix result = null;
+	result = Capstone.findWordMatrix(input);
+	assertEquals(0, result.getAllAssociationsFor("a").size());
+	
+	input = new String[] { };
+	result = Capstone.findWordMatrix(input);
+	assertEquals(0, result.getAllAssociationsFor("a").size());
+	
+	List<String> breaks = new ArrayList<>();
+	breaks.add(" ");
+	input = Capstone.tokenize("preach the docrine of the", breaks);//the one zebra
+	result = Capstone.findWordMatrix(input);
+	assertEquals(3, result.getAllAssociationsFor("the").size());
+	assertEquals(6, this.getAssociationCount(result, "the"));
+	assertEquals(3, result.getAllAssociationsFor("preach").size());
+	assertEquals(4, this.getAssociationCount(result, "preach"));
+	
+	
+	String sentence = "one two three four";
+	String[] wordsInSentence = Capstone.tokenize(sentence, DEFAULT_BREAKS_BETWEEN_WORDS);
+	System.out.println(wordsInSentence);
+	for(String word : wordsInSentence) {
+	    System.out.println(word);
+	}
+	result = Capstone.findWordMatrix(wordsInSentence);
+	result.getAllAssociationsFor("one").forEach(System.out::println);
+	assertEquals(3, result.getAllAssociationsFor("one").size());
+	assertEquals(3, result.getAllAssociationsFor("two").size());
+	assertEquals(3, result.getAllAssociationsFor("three").size());
+	assertEquals(3, result.getAllAssociationsFor("four").size());
+	assertEquals(0, result.getAllAssociationsFor("five").size());
+    }
+    
+    private int getAssociationCount(WordMatrix matrix, String word) {
+	//matrix.getAllAssociationsFor("the").stream().map(a -> a.getCount()).reduce((a, b) -> a + b) returns an Optional, 
+	//hence the get() at the end of the line below
+	if(matrix.getAllAssociationsFor(word).isEmpty()) {
+	    return 0;
+	}
+	return matrix.getAllAssociationsFor(word).stream().map(a -> a.getCount()).reduce((a, b) -> a + b).get();
+    }
+    
+    @Test
+    public void testGetWordMatrixFromFile() {
+	logger.info("\ntesting getWordMatrixFromFile()");
+	WordMatrix result = null;
+	try {
+	    result = Capstone.findWordMatrixFromFile(null);
+	    //fail("did not throw exception for null filename");
+	} catch(IOException e) {
+	    assertEquals(e.getClass(), java.io.IOException.class);
+	}
+	
+	try {
+	    result = Capstone.findWordMatrixFromFile("");
+	} catch(IOException e) {
+	    assertEquals(e.getClass(), java.io.IOException.class);
+	}
+	
+	try {
+	    result = Capstone.findWordMatrixFromFile("nonExistentFile");
+	    fail("did not throw exception for null filename");
+	} catch(IOException e) {
+	    assertEquals(e.getClass(), java.io.FileNotFoundException.class);
+	}
+	
+	try {
+	    result = Capstone.findWordMatrixFromFile("word_pair_test1.txt");
+	    assertEquals(3, result.getAllAssociationsFor("one").size());
+	    assertEquals(3, this.getAssociationCount(result, "one"));
+	    assertEquals(3, result.getAllAssociationsFor("two").size());
+	    assertEquals(3, this.getAssociationCount(result, "two"));
+	    assertEquals(3, result.getAllAssociationsFor("three").size());
+	    assertEquals(3, this.getAssociationCount(result, "three"));
+	    assertEquals(3, result.getAllAssociationsFor("four").size());
+	    assertEquals(3, this.getAssociationCount(result, "four"));
+	    assertEquals(0, result.getAllAssociationsFor("five").size());
+	    assertEquals(0, this.getAssociationCount(result, "five"));
+	} catch(IOException e) {
+	    fail(e.getClass() + " trying to get WordMatrix for word_pair_test_1.txt");
+	}
+	
+	try {
+	    result = Capstone.findWordMatrixFromFile("word_pair_test2.txt");
+	    //result.getAllAssociationsFor("one").forEach(System.out::println);
+	    assertEquals(5, result.getAllAssociationsFor("one").size());
+	    assertEquals(7, this.getAssociationCount(result, "one"));
+	    
+	    //result.getAllAssociationsFor("three").forEach(System.out::println);
+	    assertEquals(5, result.getAllAssociationsFor("three").size());
+	    assertEquals(7, this.getAssociationCount(result, "three"));
+	    
+	    //result.getAllAssociationsFor("five").forEach(System.out::println);
+	    assertEquals(5, result.getAllAssociationsFor("five").size());
+	    assertEquals(5, this.getAssociationCount(result, "five"));
+	    
+	    //result.getAllAssociationsFor("seven").forEach(System.out::println);
+	    assertEquals(1, result.getAllAssociationsFor("seven").size());
+	    assertEquals(1, this.getAssociationCount(result, "seven"));
+	    //result.getAllAssociationsFor("eight").forEach(System.out::println);
+	    assertEquals(1, result.getAllAssociationsFor("eight").size());
+	    assertEquals(1, this.getAssociationCount(result, "eight"));
+	} catch(IOException e) {
+	    fail(e.getClass() + " trying to get WordMatrix for word_pair_test_2.txt");
+	}
     }
 }

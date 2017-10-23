@@ -35,14 +35,18 @@ public class WordMatrix {
     }
     
     //TODO:  the ability to specifiy if things should be unique (don't add if it's already there)
-    //or if adding the same pair again should update the cound
+    //or if adding the same pair again should update the count;  currently it updates the count
     public WordMatrix add(String a, String b) {
+	return this.add(a, b, 1);
+    }
+    
+    public WordMatrix add(String a, String b, int count) {
 	if(a.compareTo(b) < 0) {
-	    this.addToMap(forward, a, b);
-	    this.addToMap(reverse, b, a);
+	    this.addToMap(forward, a, b, count);
+	    this.addToMap(reverse, b, a, count);
 	} else if(a.compareTo(b) > 0) {
-	    this.addToMap(forward, b, a);
-	    this.addToMap(reverse, a, b);
+	    this.addToMap(forward, b, a, count);
+	    this.addToMap(reverse, a, b, count);
 	}
 	//If a and b are the same, do nothing because it should not be added.
 	return this;
@@ -58,6 +62,18 @@ public class WordMatrix {
 	}
     }
     
+    //TODO:  Get the stack trace and verify that this is being called by another WordMatrix object.
+    /**
+     * gets the two maps used to store internal data; for use in addAll(WordMatrix)
+     * @return a List of the two maps
+     */
+    protected List<Map<String, Map<String, Integer>>> getRawData() {
+	List<Map<String, Map<String, Integer>>> maps = new ArrayList<>();
+	maps.add(forward);
+	maps.add(reverse);
+	return maps;
+    }
+    
     /**
      * So we can use the same code to add to both forward and reverse.
      * @param map
@@ -66,6 +82,14 @@ public class WordMatrix {
      * @return 
      */
     protected Map<String, Map<String, Integer>> addToMap(Map<String, Map<String, Integer>> map, String a, String b) {
+	return this.addToMap(map, a, b, 1);
+    }
+    
+    protected Map<String, Map<String, Integer>> addToMap(Map<String, Map<String, Integer>> map, String a, String b, int count) {
+	if(count < 1) {
+	    //Don't add 0 or negative values.
+	    return map;
+	}
 	if(map == null) {
 	    map = new HashMap<>();
 	}
@@ -74,9 +98,9 @@ public class WordMatrix {
 	}
 	Map<String, Integer> aMap = map.get(a);
 	if(!aMap.containsKey(b)){
-	    aMap.put(b, 1);
+	    aMap.put(b, count);
 	} else {
-	    aMap.put(b, aMap.get(b) + 1);
+	    aMap.put(b, aMap.get(b) + count);
 	}
 	return map;
     }
@@ -96,7 +120,7 @@ public class WordMatrix {
 	}
     }
     
-    public List<WordPairAssociation> getAll(String word) {
+    public List<WordPairAssociation> getAllAssociationsFor(String word) {
 	List<WordPairAssociation> result = new ArrayList<>();
 	if(forward.containsKey(word)) {
 	    for(String key : forward.get(word).keySet()) {
@@ -109,5 +133,29 @@ public class WordMatrix {
 	    }
 	}
 	return result;
+    }
+    
+    protected WordMatrix addAll(Map<String, Map<String, Integer>> map) {
+	for(String word : map.keySet()) {
+	    for(String pairedWord : map.get(word).keySet()) {
+		this.add(word, pairedWord, map.get(word).get(pairedWord));
+	    }
+	}
+	return this;
+    }
+    
+    /**
+     * Adds all the contents of the other WordMatrix to this one.
+     * @param other
+     * @return 
+     */
+    public WordMatrix addAll(WordMatrix other) {
+	if(other == null) {
+	    return this;
+	}
+	//List<Map<String, Map<String, Integer>>> maps = other.getRawData();
+	//Map<String, Map<String, Integer>> forward = other.getRawData().get(0);
+	this.addAll(other.getRawData().get(0));
+	return this;
     }
 }

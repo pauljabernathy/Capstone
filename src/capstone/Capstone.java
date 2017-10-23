@@ -13,7 +13,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import static java.util.stream.Collectors.toList;
+//import static java.util.stream.Collectors.toList;
 import toolbox.random.Random;
 import toolbox.stats.*;
 import java.util.function.Predicate;
@@ -21,12 +21,36 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
 
+//TODO:  might should return an IOException for null and empty file names
+//Some inconsistency here, since giving a non empty name of a file that does not exist results in an IOException
+//but a null or empty value for filename just returns empty results in several of these methods.
+
+
 /**
  *
  * @author pabernathy
  */
 public class Capstone {
     
+    public static String[] DEFAULT_TO_REMOVE_WHEN_READING = { "\\.", ":", "\\-", "\n", ",", };
+    //line = line.toLowerCase().trim().replaceAll("\\.", "").replaceAll(":", "").replaceAll("\\-", "").replaceAll("\n", " ")
+    //.replaceAll(",", "").replaceAll("\"", "");
+    public static final Map<String, String> DEFAULT_PREPROCESS_REPLACEMENTS;
+    public static final List<String> DEFAULT_BREAKS_BETWEEN_WORDS;
+    
+    static {
+	DEFAULT_PREPROCESS_REPLACEMENTS = new HashMap<>();
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\.", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put(":", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\-", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("\n", " ");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put(",", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("\"", "");
+	//DEFAULT_PREPROCESS_REPLACEMENTS.put("", "");
+	
+	DEFAULT_BREAKS_BETWEEN_WORDS = new ArrayList<>();
+	DEFAULT_BREAKS_BETWEEN_WORDS.add(" ");
+    }
     public static List<String> readLinesFromFile(String filename) throws IOException {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         List<String> lines = new ArrayList<>();
@@ -45,7 +69,7 @@ public class Capstone {
         return lines;
     }
     
-    public static List<String> readSentecesFromFile(String filename) throws IOException {
+    public static List<String> readSentencesFromFile(String filename) throws IOException {
         
         List<String> allSentences = new ArrayList<>();
         if(filename == null || filename.equals("")) {
@@ -59,7 +83,7 @@ public class Capstone {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         while(reader.ready()) {
             currentLine = reader.readLine();
-            currentSentences = split(currentLine, sentenceBreaks);
+            currentSentences = Capstone.tokenize(currentLine, sentenceBreaks);
             if(currentSentences.length == 0) {
                 //I don't know why this would happen but check anyway.
                 continue;
@@ -67,7 +91,7 @@ public class Capstone {
             if(splitSentenceLastLine) {
                 //currentSentences[0] = leftoverSentencePart + currentSentences[0];
                 if(!allSentences.isEmpty()) {
-                    //add the first sentence fragment to the last one recorded, because they are apparently the same sentence split across two lines
+                    //add the first sentence fragment to the last one recorded, because they are apparently the same sentence tokenize across two lines
                     allSentences.set(allSentences.size() - 1, allSentences.get(allSentences.size() - 1).replace("\n", "") + " " + currentSentences[0]); //The + " " before currentSentences[0] is so it won't combine the last word of the previous line with the first word of the next line into the same word.
                     //Now add the rest to allSentences.
                     for(int i = 1; i < currentSentences.length; i++) {
@@ -97,11 +121,24 @@ public class Capstone {
         return allSentences;
     }
     
-    public static String[] split(String text, List<String> breaks) {
-        return split(text, breaks, Arrays.asList("..."));
+    /**
+     * Tokenize the given text, using the breaks list as a list of things separating each token.
+     * @param text The text to tokenize
+     * @param breaks The list of characters or string to use as separators.
+     * @return 
+     */
+    public static String[] tokenize(String text, List<String> breaks) {
+        return tokenize(text, breaks, Arrays.asList("..."));
     }
     
-    public static String[] split(String text, List<String> breaks, List<String> whiteList) {
+    /**
+     * Tokenize text, using the breaks List as a list of things separating each token
+     * @param text The text to tokenize
+     * @param breaks The list of characters or string to use as separators.
+     * @param toRemove
+     * @return 
+     */
+    public static String[] tokenize(String text, List<String> breaks, List<String> toRemove) {
         String[] result = new String[] {};
         if(text == null || text.length() == 0) {
             return result;
@@ -113,7 +150,7 @@ public class Capstone {
         }
         
         //TODO:  a better way of handling it than removing
-        for(String s : whiteList) {
+        for(String s : toRemove) {
             text = text.replace(s, "");
         }
         String regex = "[";
@@ -159,7 +196,7 @@ public class Capstone {
     }
     
     public static List<WordPairSeparation> getWordPairSeparationsFromFile(String filename) throws IOException {
-        List<String> sentences = readSentecesFromFile(filename);
+        List<String> sentences = readSentencesFromFile(filename);
         List<WordPairSeparation> pairs = new ArrayList<>();
         Optional<List<WordPairSeparation>> current = null;
         for(String sentence : sentences) {
@@ -380,7 +417,13 @@ public class Capstone {
         return h;
     }
     
+    //TODO:  rethrow this Exception!
     public static List<String> readFileAsStrings(String filename, String delimiter) {
+	return readFileAsStrings(filename, delimiter, DEFAULT_PREPROCESS_REPLACEMENTS);
+    }
+    
+    //TODO:  Unit test after blacklist update!
+    public static List<String> readFileAsStrings(String filename, String delimiter, Map<String, String> replacements) {
         List<String> result = new ArrayList<>();
         if(filename == null || filename.equals("") || delimiter == null) {
             return result;
@@ -391,7 +434,11 @@ public class Capstone {
             
             while(reader.ready()) {
                 line = reader.readLine();
-                line = line.toLowerCase().trim().replaceAll("\\.", "").replaceAll(":", "").replaceAll("\\-", "").replaceAll("\n", " ").replaceAll(",", "").replaceAll("\"", "");
+		//line = line.toLowerCase().trim().replaceAll("\\.", "").replaceAll(":", "").replaceAll("\\-", "").replaceAll("\n", " ").replaceAll(",", "").replaceAll("\"", "");
+		line = line.toLowerCase().trim();
+		for(String toReplace : replacements.keySet()) {
+		    line = line.replaceAll(toReplace, replacements.get(toReplace));
+		}
                     
                 if(line != null && !"".equals(line)) {
                     words = line.split(delimiter);
@@ -399,7 +446,7 @@ public class Capstone {
                 }
             }
         } catch(IOException e) {
-            System.err.println(e.getClass() + " in findLongestLine(" + filename + "):  " + e.getMessage());
+            System.err.println(e.getClass() + " in readFileAsString(" + filename + "):  " + e.getMessage());
         }
         return result;
     }
@@ -485,5 +532,30 @@ public class Capstone {
         result.add("lines:  " + lineCount);
         result.add("words:  " + wordCount);
         return result;
+    }
+    
+    public static WordMatrix findWordMatrix(String[] words) {
+	WordMatrix matrix = new WordMatrix();
+	if(words == null || words.length == 0) { 
+	    return matrix;
+	}
+	for(int i = 0; i < words.length; i++) {
+	    for(int j = i + 1; j < words.length; j++) {
+		matrix.add(words[i], words[j]);
+	    }
+	}
+	return matrix;
+    }
+    
+    public static WordMatrix findWordMatrixFromFile(String filename) throws IOException {
+	List<String> sentences = readSentencesFromFile(filename);
+	WordMatrix matrix = new WordMatrix();
+	String[] wordsInSentence = null;
+	//List<String> wordSeparators = 
+	for(String sentence : sentences) {
+	    wordsInSentence = Capstone.tokenize(sentence, DEFAULT_BREAKS_BETWEEN_WORDS);
+	    matrix.addAll(findWordMatrix(wordsInSentence));
+	}
+	return matrix;
     }
 }
