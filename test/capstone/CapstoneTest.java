@@ -81,9 +81,10 @@ public class CapstoneTest {
         logger.info("\ntesting readSentencesFromFile()");
         List<String> result = null;
         try {
-            assertEquals(0, Capstone.readSentencesFromFile(null).size());
+	    String filename = null;
+            assertEquals(0, Capstone.readSentencesFromFile(filename).size());
             List<String> sentenceBreaks = Arrays.asList(".", "!", "?");
-            String filename = "through_the_looking_glass.txt";
+            filename = "through_the_looking_glass.txt";
             filename = "sentenceSample1.txt";
             List<String> sentences = Capstone.readSentencesFromFile(filename);
             sentences.stream().limit(20).forEach(System.out::println);
@@ -161,7 +162,14 @@ public class CapstoneTest {
 	sentenceBreaks = new ArrayList<>();
 	sentenceBreaks.add(" ");
 	splits = Capstone.tokenize(text, sentenceBreaks);
-	assertEquals(4, splits.length);
+	logger.debug(toolbox.util.ListArrayUtil.arrayToString(splits));
+	//assertEquals(4, splits.length);
+	assertEquals(1, splits.length);	//now it is 1 because this function removes stopwords by default, so it removes "one" "two" and "five"
+	
+	text = "one two three four";
+	List<String> tokens = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));//Capstone.DEFAULT_BREAKS_BETWEEN_WORDS);
+	logger.debug(tokens);
+	assertEquals(4, tokens.size());
     }
     
     @Test
@@ -611,13 +619,13 @@ public class CapstoneTest {
         hist = Capstone.fileSummaryTreeHistogram("../Toolbox/les_miserables.txt", " ");
         hist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(10).forEach(System.out::println);*/
         
-        this.doTreeHistogram("twitterSample5.txt");
+        //this.doTreeHistogram("twitterSample5.txt");
         //this.doTreeHistogram("en_US.twitter.txt");
         
         //this.doTreeHistogram("newsSample1.txt");
         //this.doTreeHistogram("newsSample2.txt");
         //this.doTreeHistogram("newsSample3.txt");
-        this.doTreeHistogram("newsSample4.txt");
+        //this.doTreeHistogram("newsSample4.txt");
         //this.doTreeHistogram("newsSample5.txt");
         
         /*this.doTreeHistogram("blogsSample1.txt");
@@ -625,14 +633,16 @@ public class CapstoneTest {
         this.doTreeHistogram("blogsSample3.txt");
         this.doTreeHistogram("blogsSample4.txt");
         this.doTreeHistogram("blogsSample5.txt");*/
+	
+	this.doTreeHistogram("through_the_looking_glass.txt");
     }
     
     private void doTreeHistogram(String filename) {
         logger.info("\ndoing TreeHistogram for " + filename);
         System.out.flush();
         long startTime = Calendar.getInstance().getTimeInMillis();
-        TreeHistogram<String> hist = Capstone.fileSummaryTreeHistogram(filename, " ");
-        List<HistogramEntry> list = hist.getAsList(TreeHistogram.Sort.COUNT);
+        TreeHistogram<String> hist = Capstone.fileSummaryTreeHistogram(new Request(filename));
+        List<HistogramEntry<String>> list = hist.getAsList(TreeHistogram.Sort.COUNT);
         long stopTime = Calendar.getInstance().getTimeInMillis();
         System.out.println("total words:  " + hist.getTotalCount());
         System.out.println("unique words:  " + list.size());
@@ -678,6 +688,27 @@ public class CapstoneTest {
 	assertEquals(0, result.getAllAssociationsFor("five").size());
     }
     
+    @Test
+    public void testFindWordMatrixFromList() {
+	logger.info("\ntesting findWordMatrix(List<String>)");
+	List<String> words = new ArrayList<>();
+	words.add("one");
+	words.add("two");
+	words.add("two");
+	words.add("three");
+	words.add("three");
+	words.add("three");
+	WordMatrix matrix = Capstone.findWordMatrix(words);
+	assertEquals(2, matrix.getAllAssociationsFor("one").size());
+	assertEquals(5, this.getAssociationCount(matrix, "one"));
+	System.out.println(matrix.getAllAssociationsFor("two"));
+	assertEquals(2, matrix.getAllAssociationsFor("two").size());
+	assertEquals(8, this.getAssociationCount(matrix, "two"));
+	System.out.println(matrix.getAllAssociationsFor("three"));
+	assertEquals(2, matrix.getAllAssociationsFor("three").size());
+	assertEquals(9, this.getAssociationCount(matrix, "three"));
+    }
+    
     private int getAssociationCount(WordMatrix matrix, String word) {
 	//matrix.getAllAssociationsFor("the").stream().map(a -> a.getCount()).reduce((a, b) -> a + b) returns an Optional, 
 	//hence the get() at the end of the line below
@@ -688,7 +719,7 @@ public class CapstoneTest {
     }
     
     @Test
-    public void testGetWordMatrixFromFile() {
+    public void testFindWordMatrixFromFile() {
 	logger.info("\ntesting getWordMatrixFromFile()");
 	WordMatrix result = null;
 	try {
@@ -699,20 +730,25 @@ public class CapstoneTest {
 	}
 	
 	try {
-	    result = Capstone.findWordMatrixFromFile("");
+	    result = Capstone.findWordMatrixFromFile(new Request(""));
 	} catch(IOException e) {
 	    assertEquals(e.getClass(), java.io.IOException.class);
 	}
 	
 	try {
-	    result = Capstone.findWordMatrixFromFile("nonExistentFile");
+	    result = Capstone.findWordMatrixFromFile(new Request("nonExistentFile"));
 	    fail("did not throw exception for null filename");
 	} catch(IOException e) {
 	    assertEquals(e.getClass(), java.io.FileNotFoundException.class);
 	}
 	
-	try {
-	    result = Capstone.findWordMatrixFromFile("word_pair_test1.txt");
+	/**/try {
+	    result = Capstone.findWordMatrixFromFile(new Request("word_pair_test1.txt").setRemoveStopWords(false));
+	    System.out.println(result.getAllAssociationsFor("one"));
+	    System.out.println(result.getAllAssociationsFor("two"));
+	    System.out.println(result.getAllAssociationsFor("three"));
+	    System.out.println(result.getAllAssociationsFor("four"));
+	    System.out.println(result.getAllAssociationsFor("five"));
 	    assertEquals(3, result.getAllAssociationsFor("one").size());
 	    assertEquals(3, this.getAssociationCount(result, "one"));
 	    assertEquals(3, result.getAllAssociationsFor("two").size());
@@ -725,10 +761,10 @@ public class CapstoneTest {
 	    assertEquals(0, this.getAssociationCount(result, "five"));
 	} catch(IOException e) {
 	    fail(e.getClass() + " trying to get WordMatrix for word_pair_test_1.txt");
-	}
+	}/**/
 	
-	try {
-	    result = Capstone.findWordMatrixFromFile("word_pair_test2.txt");
+	/**/try {
+	    result = Capstone.findWordMatrixFromFile(new Request("word_pair_test2.txt").setRemoveStopWords(false));
 	    //result.getAllAssociationsFor("one").forEach(System.out::println);
 	    assertEquals(5, result.getAllAssociationsFor("one").size());
 	    assertEquals(7, this.getAssociationCount(result, "one"));
@@ -749,6 +785,44 @@ public class CapstoneTest {
 	    assertEquals(1, this.getAssociationCount(result, "eight"));
 	} catch(IOException e) {
 	    fail(e.getClass() + " trying to get WordMatrix for word_pair_test_2.txt");
+	}/**/
+    }
+    
+    @Test
+    public void testFindWordMatrixFromSentenceList() {
+	logger.info("\ntesting findWordMatrixFromSentenceList()");
+	List<String> sentences = null;
+	WordMatrix result = Capstone.findWordMatrixFromSentenceList(sentences);
+	if(result == null) {
+	    fail("result should not have been null");
 	}
+	
+	sentences = new ArrayList<>();
+	result = Capstone.findWordMatrixFromSentenceList(sentences);
+	if(result == null) {
+	    fail("result should not have been null");
+	}
+	
+	sentences.add("one two three four five six");
+	sentences.add("seven eight");
+	sentences.add("one two three");
+	result = Capstone.findWordMatrixFromSentenceList(sentences);
+	assertEquals(5, result.getAllAssociationsFor("one").size());
+	assertEquals(7, this.getAssociationCount(result, "one"));
+
+	//result.getAllAssociationsFor("three").forEach(System.out::println);
+	assertEquals(5, result.getAllAssociationsFor("three").size());
+	assertEquals(7, this.getAssociationCount(result, "three"));
+
+	//result.getAllAssociationsFor("five").forEach(System.out::println);
+	assertEquals(5, result.getAllAssociationsFor("five").size());
+	assertEquals(5, this.getAssociationCount(result, "five"));
+
+	//result.getAllAssociationsFor("seven").forEach(System.out::println);
+	assertEquals(1, result.getAllAssociationsFor("seven").size());
+	assertEquals(1, this.getAssociationCount(result, "seven"));
+	//result.getAllAssociationsFor("eight").forEach(System.out::println);
+	assertEquals(1, result.getAllAssociationsFor("eight").size());
+	assertEquals(1, this.getAssociationCount(result, "eight"));
     }
 }

@@ -20,6 +20,7 @@ import java.util.function.Predicate;
 import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
+import toolbox.util.ListArrayUtil;
 
 //TODO:  might should return an IOException for null and empty file names
 //Some inconsistency here, since giving a non empty name of a file that does not exist results in an IOException
@@ -37,7 +38,9 @@ public class Capstone {
     //.replaceAll(",", "").replaceAll("\"", "");
     public static final Map<String, String> DEFAULT_PREPROCESS_REPLACEMENTS;
     public static final List<String> DEFAULT_BREAKS_BETWEEN_WORDS;
+    public static final List<String> DEFAULT_SENTENCE_BREAKS;
     
+    //TODO:  use regex for replacements, so you can do things like remove ' at the start and end but not in the middle of the word
     static {
 	DEFAULT_PREPROCESS_REPLACEMENTS = new HashMap<>();
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\.", "");
@@ -50,6 +53,9 @@ public class Capstone {
 	
 	DEFAULT_BREAKS_BETWEEN_WORDS = new ArrayList<>();
 	DEFAULT_BREAKS_BETWEEN_WORDS.add(" ");
+	
+	DEFAULT_SENTENCE_BREAKS = Arrays.asList(".", "!", "?");
+	
     }
     public static List<String> readLinesFromFile(String filename) throws IOException {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
@@ -70,21 +76,27 @@ public class Capstone {
     }
     
     public static List<String> readSentencesFromFile(String filename) throws IOException {
-        
+	return readSentencesFromFile(new Request(filename));
+    }
+    
+    public static List<String> readSentencesFromFile(Request request) throws IOException {
+        String filename = request.getFilename();
         List<String> allSentences = new ArrayList<>();
         if(filename == null || filename.equals("")) {
             return allSentences;
         }
-        List<String> sentenceBreaks = Arrays.asList(".", "!", "?");
+        //List<String> sentenceBreaks = Arrays.asList(".", "!", "?");
         String currentLine = null;
         String leftoverSentencePart = null;
-        String[] currentSentences = null;
+        //String[] currentSentences = null;
+	List<String> currentSentences = null;
         boolean splitSentenceLastLine = false;
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         while(reader.ready()) {
             currentLine = reader.readLine();
-            currentSentences = Capstone.tokenize(currentLine, sentenceBreaks);
-            if(currentSentences.length == 0) {
+            currentSentences = Capstone.tokenize(currentLine, request.setWordBreaks(DEFAULT_SENTENCE_BREAKS));	//a hack to tell it to tokenize based on the sentence breaks
+	    //TODO:  a better long term solution than the above hack
+            if(currentSentences.size() == 0) {
                 //I don't know why this would happen but check anyway.
                 continue;
             }
@@ -92,24 +104,24 @@ public class Capstone {
                 //currentSentences[0] = leftoverSentencePart + currentSentences[0];
                 if(!allSentences.isEmpty()) {
                     //add the first sentence fragment to the last one recorded, because they are apparently the same sentence tokenize across two lines
-                    allSentences.set(allSentences.size() - 1, allSentences.get(allSentences.size() - 1).replace("\n", "") + " " + currentSentences[0]); //The + " " before currentSentences[0] is so it won't combine the last word of the previous line with the first word of the next line into the same word.
+                    allSentences.set(allSentences.size() - 1, allSentences.get(allSentences.size() - 1).replace("\n", "") + " " + currentSentences.get(0)); //The + " " before currentSentences[0] is so it won't combine the last word of the previous line with the first word of the next line into the same word.
                     //Now add the rest to allSentences.
-                    for(int i = 1; i < currentSentences.length; i++) {
-                        if(currentSentences[i] != null && currentSentences[i].length() > 0) {
-                            allSentences.add(currentSentences[i]);
+                    for(int i = 1; i < currentSentences.size(); i++) {
+                        if(currentSentences.get(i) != null && currentSentences.get(i).length() > 0) {
+                            allSentences.add(currentSentences.get(i));
                         }
                     }
                 } else {
                     //should never get here
-                    allSentences.addAll(Arrays.asList(currentSentences));
+                    allSentences.addAll(currentSentences);
                     System.err.println("in Capstone::readSentencesFromFile(): splitSentenceLastLine was true but allSentences was empty");
                 }
             } else {
                 //There is no leftover sentence fragment, so just add them all
-                allSentences.addAll(Arrays.asList(currentSentences));
+                allSentences.addAll(currentSentences);
             }
             splitSentenceLastLine = true;
-            for(String punct : sentenceBreaks) {
+            for(String punct : request.getSentenceBreaks()) {
                 if(currentLine.endsWith(punct)) {
                     splitSentenceLastLine = false;
                     break;
@@ -121,6 +133,7 @@ public class Capstone {
         return allSentences;
     }
     
+    //TODO:  return List<String>; This appears in a number of places so it will take a few minutes to refactor.
     /**
      * Tokenize the given text, using the breaks list as a list of things separating each token.
      * @param text The text to tokenize
@@ -128,24 +141,28 @@ public class Capstone {
      * @return 
      */
     public static String[] tokenize(String text, List<String> breaks) {
-        return tokenize(text, breaks, Arrays.asList("..."));
+        //return tokenize(text, breaks, Arrays.asList("...")).toArray(new String[] {});
+	return tokenize(text, new Request("").setWordBreaks(breaks).setRemoveStopWords(true), Arrays.asList("...")).toArray(new String[] {});
     }
     
-    /**
-     * Tokenize text, using the breaks List as a list of things separating each token
-     * @param text The text to tokenize
-     * @param breaks The list of characters or string to use as separators.
-     * @param toRemove
-     * @return 
-     */
-    public static String[] tokenize(String text, List<String> breaks, List<String> toRemove) {
-        String[] result = new String[] {};
+    //TODO:  Get that Arrays.asList("...") out of there.
+    public static List<String> tokenize(String text, Request request) {
+	return tokenize(text, request, Arrays.asList("..."));
+    }
+    
+    public static List<String> tokenize(String text, Request request, List<String> toRemove) {
+	//System.out.println("tokenize " + request.shouldRemoveStopWords());
+	//System.out.println(text);
+	//System.out.println(request.getStopWords().isStopWord("the"));
+	List<String> breaks = request.getWordBreaks();
+        List<String> result = new ArrayList<>();
         if(text == null || text.length() == 0) {
             return result;
         }
         if(breaks == null || breaks.isEmpty()) {
-            result = new String[1];
-            result[0] = text;
+            //result = new String[1];
+            //result[0] = text;
+	    result.add(text);
             return result;
         }
         
@@ -158,9 +175,21 @@ public class Capstone {
             regex += s;
         }
         regex += "]";
-        result = text.split(regex);
-        for(int i = 0; i < result.length; i++) {
-            result[i] = result[i].replace("\t", "").trim();
+	String[] words = text.split(regex);
+	String word = null;
+        for(int i = 0; i < words.length; i++) {
+	    word = words[i].replace("\t", "").trim().toLowerCase();
+	    //System.out.println(word);
+	    if(word == null || word.isEmpty()) {
+		continue;
+	    }
+	    if(!request.shouldRemoveStopWords()) {
+		//System.out.println("adding " + word + ", not caring about stop words");
+		result.add(word);
+	    } else if(!request.getStopWords().isStopWord(word)) {
+		//System.out.println("adding " + word + ", which is not a stop word");
+		result.add(word);
+	    } 
         }
         return result;
     }
@@ -312,6 +341,17 @@ public class Capstone {
                     //do nothing
             }
         }
+	//TreeHistogram hist = Capstone.fileSummaryTreeHistogram(new Request("through_the_looking_glass.txt"));
+	//hist.getAsList(toolbox.stats.TreeHistogram.Sort.COUNT).forEach(System.out::println);
+	try {
+	    WordMatrix matrix = Capstone.findWordMatrixFromFile(new Request("through_the_looking_glass.txt"));
+	    System.out.println(matrix.getAllAssociationsFor("knight"));
+	    System.out.println(matrix.getAllAssociationsFor("looking"));
+	    System.out.println(matrix.getAllAssociationsFor("glass"));
+	} catch(IOException e) {
+	    System.err.println(e.getClass() + " trying to get the WordMatrix:  " + e.getMessage());
+	}
+	System.out.println("got the word matrix?");
     }
     
     public static String findLongestLine(String filename) {
@@ -477,12 +517,12 @@ public class Capstone {
         return new Histogram(allWords).setLabel("num lines " + lineCount + "; num words " + wordCount);
     }
     
-    public static TreeHistogram fileSummaryTreeHistogram(String filename, String delimiter) {
+    public static TreeHistogram fileSummaryTreeHistogram(Request request) {
         List<String> allWords = new ArrayList<>();
         int lineCount = 0;
         int wordCount = 0;
         TreeHistogram<String> hist = new TreeHistogram<String>();
-        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(request.getFilename()))) {
             String line = "";
             String[] words = { };
             
@@ -490,7 +530,7 @@ public class Capstone {
                 line = reader.readLine();
                 lineCount++;
                 if(line != null && !"".equals(line)) {
-                    words = line.split(delimiter);
+                    words = Capstone.tokenize(line, request, Arrays.asList("...")).toArray(new String[] {});
                     if(words == null) {
                         continue;
                     }
@@ -499,7 +539,7 @@ public class Capstone {
                 }
             }
         } catch(IOException e) {
-            System.err.println(e.getClass() + " in findLongestLine(" + filename + "):  " + e.getMessage());
+            System.err.println(e.getClass() + " in fileSummaryHistogram(" + request.getFilename() + "):  " + e.getMessage());
         }
         allWords.stream().forEach(word -> hist.insert(word, 1));
         return hist;
@@ -547,13 +587,39 @@ public class Capstone {
 	return matrix;
     }
     
-    public static WordMatrix findWordMatrixFromFile(String filename) throws IOException {
-	List<String> sentences = readSentencesFromFile(filename);
+    public static WordMatrix findWordMatrix(List<String> matrix) {
+	return findWordMatrix(matrix.toArray(new String[]{}));
+    }
+    
+    public static WordMatrix findWordMatrixFromFile(Request request) throws IOException {
 	WordMatrix matrix = new WordMatrix();
-	String[] wordsInSentence = null;
+	if(request == null) {
+	    return matrix;
+	}
+	List<String> sentences = readSentencesFromFile(request.getFilename());
+	List<String> wordsInSentence = null;
 	//List<String> wordSeparators = 
 	for(String sentence : sentences) {
-	    wordsInSentence = Capstone.tokenize(sentence, DEFAULT_BREAKS_BETWEEN_WORDS);
+	    wordsInSentence = Capstone.tokenize(sentence, request);
+	    System.out.println(sentence);
+	    System.out.println(wordsInSentence);
+	    matrix.addAll(findWordMatrix(wordsInSentence));
+	}
+	return matrix;
+    }
+    
+    //TODO: unit test
+    public static WordMatrix findWordMatrixFromSentenceList(List<String> sentences) {
+	WordMatrix matrix = new WordMatrix();
+	if(sentences == null) {
+	    return matrix;
+	}
+	List<String> wordsInSentence = null;
+	//List<String> wordSeparators = 
+	for(String sentence : sentences) {
+	    wordsInSentence = Capstone.tokenize(sentence, new Request(sentence).setRemoveStopWords(false));
+	    System.out.println(sentence);
+	    System.out.println(wordsInSentence);
 	    matrix.addAll(findWordMatrix(wordsInSentence));
 	}
 	return matrix;

@@ -10,7 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import static java.util.stream.Collectors.toList;
 
+//TODO: Important question I just though of:  should the association of words be directional?  Right now it is not.  But let's say that the word "money" appears in a sentence three times
+//and the word "fiduciary" appears once, should we say that money and fiduciary are linked three times (as currently), or that fiduciary "sees" monney three times
+//but money only "sees" fiducidary once?  That seems like an important question that could affect the way text is analyzed.
+//Something to do for later maybe because it will take some extra work.
 /**
  *
  * @author paul
@@ -120,6 +125,10 @@ public class WordMatrix {
 	}
     }
     
+    public List<WordPairAssociation> getTopAssociationsFor(String word, int limit) {
+	return this.getAllAssociationsFor(word).stream().limit(limit).collect(toList());
+    }
+    
     public List<WordPairAssociation> getAllAssociationsFor(String word) {
 	List<WordPairAssociation> result = new ArrayList<>();
 	if(forward.containsKey(word)) {
@@ -132,6 +141,16 @@ public class WordMatrix {
 		result.add(new WordPairAssociation(word, key, reverse.get(word).get(key)));
 	    }
 	}
+	//TODO: a sorting option parameter
+	result.sort((a, b) -> {
+	    if(a.getCount() < b.getCount()) {
+		return 1;
+	    } else if(a.getCount() == b.getCount()) {
+		return 0;
+	    } else {
+		return -1;
+	    }
+	 });
 	return result;
     }
     

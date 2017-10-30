@@ -144,7 +144,7 @@ public class NGramsTest {
             assertEquals(5, result.getNumEntries());
             
             result = NGrams.getNGramsTree("blogsSample2.txt", 4, " ", true);
-            List<HistogramEntry> words = result.getAsList(TreeHistogram.Sort.COUNT);
+            List<HistogramEntry<String>> words = result.getAsList(TreeHistogram.Sort.COUNT);
             words.stream().limit(10).forEach(System.out::println);
             System.out.println("\nand a case of:");
             words.stream().filter(entry -> entry.toString().startsWith("a case of")).forEach(System.out::println);

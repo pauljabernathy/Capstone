@@ -146,6 +146,35 @@ public class WordMatrixTest {
     }
     
     @Test
+    public void testGetTopAssociations() {
+	logger.info("\ntesting getTopAssociations()");
+	WordMatrix instance = new WordMatrix();
+	instance.add("cain", "abel", 25);
+	instance.add("cain", "citizen", 3);
+	instance.add("grape", "wrath", 2);
+	instance.add("grape", "raisin", 6);
+	instance.add("wine", "grape", 8);
+	instance.add("grape", "fruit", 3);
+	
+	List<WordPairAssociation> result = null;
+	result = instance.getTopAssociationsFor("grape", 3);
+	result.forEach(System.out::println);
+	assertEquals(3, result.size());
+	assertEquals("wine", result.get(0).getSecond());
+	assertEquals(8, result.get(0).getCount());
+	
+	assertEquals("fruit", result.get(2).getFirst());
+	assertEquals("grape", result.get(2).getSecond());
+	assertEquals(3, result.get(2).getCount());
+	
+	result = instance.getTopAssociationsFor("cain", 3);
+	assertEquals(2, result.size());
+	
+	result = instance.getTopAssociationsFor("rockband", 87);
+	assertEquals(0, result.size());
+    }
+    
+    @Test
     public void testGetAllAssociationsForSpecificWord() {
 	logger.info("\ntesting getAll");
 	WordMatrix instance = new WordMatrix();

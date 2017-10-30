@@ -89,4 +89,17 @@ public class StopWordsTest {
 	assertFalse(instance.isStopWord("monte carlo"));
     }
     
+    //@Test
+    public void testRemoveStopWords() {
+	logger.info("\ntesting removeStopWords()");
+	StopWords instance = new StopWords();
+	String line = null;
+	line = instance.removeStopWords(line);
+	assertNull(line);
+	line = instance.removeStopWords("");
+	assertTrue(line.isEmpty());
+	
+	line = instance.removeStopWords("nevermind that we instantiated the variable altruistically");
+	assertEquals("nevermind  we instantiated  variable altruistically", line);
+    }
 }

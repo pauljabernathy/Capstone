@@ -76,4 +76,13 @@ public class WordPairAssociation {
     public String toString() {
 	return this.first + " " + this.second + " " + this.count;
     }
+    
+    public String toStringExclude(String toExclude) {
+	if(first.equals(toExclude)) {
+	    return this.second + " " + this.count;
+	} else if(second.equals(toExclude)) {
+	    return this.first + " " + this.count;
+	}
+	return this.toString();
+    }
 }
