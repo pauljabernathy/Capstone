@@ -99,6 +99,16 @@ public class CapstoneTest {
 	    sentences = Capstone.readSentencesFromFile(filename);
             sentences.stream().limit(20).forEach(System.out::println);
             assertEquals(1, sentences.size());
+	    
+	    filename = "sentenceSample2.txt";
+	    logger.info("\n" + filename);
+	    sentences = Capstone.readSentencesFromFile(filename);
+            sentences.stream().limit(20).forEach(System.out::println);
+	    
+	    filename = "sentenceSample3.txt";
+	    logger.info("\n" + filename);
+	    sentences = Capstone.readSentencesFromFile(filename);
+            sentences.stream().limit(20).forEach(s -> System.out.println("-" + s));
         } catch(IOException e) {
             System.err.println(e.getClass() + " " + e.getMessage());
         }
@@ -291,7 +301,7 @@ public class CapstoneTest {
         logger.debug(result.get(5).getAsList(toolbox.stats.TreeHistogram.Sort.ITEM));
     }
     
-    @Test
+    //@Test
     public void testGetWordPairSepHistogramsFromLargeFile() {
         logger.info("\ntesting getWordPairSepHistogramsFromFile(), from one of the larger data files");
         Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
@@ -322,31 +332,31 @@ public class CapstoneTest {
         return result;
     }
     
-    @Test
+    //@Test
     public void testampleLinesFromFile() {
-        logger.info("\ntestampleLinesFromFile()");
+        logger.info("\ntesting sampleLinesFromFile()");
         //instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample1.txt", .001);
         //instance.sampleLinesFromFile("/Users/pabernathy/coursera/datascience/final/en_US/en_US.news.txt", "/Users/pabernathy/coursera/datascience/final/en_US/newsSample1.txt", .001);
         //instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.twitter.txt", "twitterSample5.txt", .75);
         //instance.sampleLinesFromFile("/Users/pabernathy/coursera/datascience/final/en_US/en_US.twitter.txt", "/Users/pabernathy/coursera/datascience/final/en_US/twitterSample2.txt", .0001);
         
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample1.txt", .1);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample2.txt", .33);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample3.txt", .5);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample4.txt", .66);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample5.txt", .75);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample1.txt", .1);
+        /*Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample2.txt", .33);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample3.txt", .5);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample4.txt", .66);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample5.txt", .75);
         
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample1.txt", .1);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample2.txt", .33);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample3.txt", .5);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample4.txt", .66);
-        instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample5.txt", .75);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample1.txt", .1);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample2.txt", .33);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample3.txt", .5);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample4.txt", .66);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample5.txt", .75);*/
     }
     
     /**
      * Test of findLongestLine method, of class Capstone.
      */
-    @Test
+    //@Test
     public void testFindLongestLine() {
         logger.info("findLongestLine");
         String filename = "";
@@ -665,7 +675,7 @@ public class CapstoneTest {
 	
 	List<String> breaks = new ArrayList<>();
 	breaks.add(" ");
-	input = Capstone.tokenize("preach the docrine of the", breaks);//the one zebra
+	input = "preach the docrine of the".split(" ");//Capstone.tokenize("preach the docrine of the", breaks);//the one zebra
 	result = Capstone.findWordMatrix(input);
 	assertEquals(3, result.getAllAssociationsFor("the").size());
 	assertEquals(6, this.getAssociationCount(result, "the"));
@@ -674,7 +684,7 @@ public class CapstoneTest {
 	
 	
 	String sentence = "one two three four";
-	String[] wordsInSentence = Capstone.tokenize(sentence, DEFAULT_BREAKS_BETWEEN_WORDS);
+	String[] wordsInSentence = "one two three four".split(" ");//Capstone.tokenize(sentence, DEFAULT_BREAKS_BETWEEN_WORDS);
 	System.out.println(wordsInSentence);
 	for(String word : wordsInSentence) {
 	    System.out.println(word);
@@ -792,13 +802,13 @@ public class CapstoneTest {
     public void testFindWordMatrixFromSentenceList() {
 	logger.info("\ntesting findWordMatrixFromSentenceList()");
 	List<String> sentences = null;
-	WordMatrix result = Capstone.findWordMatrixFromSentenceList(sentences);
+	WordMatrix result = Capstone.findWordMatrixFromSentenceList(sentences, new Request(null));
 	if(result == null) {
 	    fail("result should not have been null");
 	}
 	
 	sentences = new ArrayList<>();
-	result = Capstone.findWordMatrixFromSentenceList(sentences);
+	result = Capstone.findWordMatrixFromSentenceList(sentences, new Request(""));
 	if(result == null) {
 	    fail("result should not have been null");
 	}
@@ -806,7 +816,7 @@ public class CapstoneTest {
 	sentences.add("one two three four five six");
 	sentences.add("seven eight");
 	sentences.add("one two three");
-	result = Capstone.findWordMatrixFromSentenceList(sentences);
+	result = Capstone.findWordMatrixFromSentenceList(sentences, new Request("").setRemoveStopWords(false));
 	assertEquals(5, result.getAllAssociationsFor("one").size());
 	assertEquals(7, this.getAssociationCount(result, "one"));
 

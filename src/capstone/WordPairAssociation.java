@@ -6,6 +6,8 @@
 
 package capstone;
 
+import java.util.Optional;
+
 /**
  *
  * @author paul
@@ -84,5 +86,15 @@ public class WordPairAssociation {
 	    return this.first + " " + this.count;
 	}
 	return this.toString();
+    }
+    
+    public Optional<String> getOther(String a) {
+	if(first.equals(a)) {
+	    return Optional.of(second);
+	} else if(second.equals(a)) {
+	    return Optional.of(first);
+	} else {
+	    return Optional.empty();
+	}
     }
 }

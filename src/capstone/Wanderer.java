@@ -51,7 +51,7 @@ public class Wanderer {
 	    
 	    TreeHistogram<String> ngrams = NGrams.readNGramsFromFile(filename);
 	    
-	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences);
+	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request("").setRemoveStopWords(true));
 	    
 	    for(String sentence : sampleSentences) {
 		System.out.println();

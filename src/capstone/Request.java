@@ -22,18 +22,20 @@ public class Request {
     private Map<String, String> replacements;
     
     private boolean removeStopWords;
+    private boolean binaryAssociationsOnly;	//whether or not word assocations should keep track of the count, or just that one exists
     
-    public Request(String filename, List<String> wordBreaks, List<String> sentenceBreaks, StopWords stopWords, Map<String, String> replacements, boolean removeStopWords) {
+    public Request(String filename, List<String> wordBreaks, List<String> sentenceBreaks, StopWords stopWords, Map<String, String> replacements, boolean removeStopWords, boolean binaryAssociationOnly) {
 	this.filename = filename;
 	this.wordBreaks = wordBreaks;
 	this.sentenceBreaks = sentenceBreaks;
 	this.stopWords = stopWords;
 	this.replacements = replacements;
 	this.removeStopWords = removeStopWords;
+	this.binaryAssociationsOnly = binaryAssociationsOnly;
     }
     
     public Request(String filename) {
-	this(filename, Capstone.DEFAULT_BREAKS_BETWEEN_WORDS, Capstone.DEFAULT_SENTENCE_BREAKS, new StopWords(), Capstone.DEFAULT_PREPROCESS_REPLACEMENTS, true);
+	this(filename, Capstone.DEFAULT_BREAKS_BETWEEN_WORDS, Capstone.DEFAULT_SENTENCE_BREAKS, new StopWords(), Capstone.DEFAULT_PREPROCESS_REPLACEMENTS, Constants.DEFAULT_SHOULD_REMOVE_STOP_WORDS, Constants.DEFAULT_BINARY_ASSOCIATIONS_ONLY);
     }
 
     public String getFilename() {

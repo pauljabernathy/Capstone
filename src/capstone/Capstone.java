@@ -50,7 +50,7 @@ public class Capstone {
 	DEFAULT_PREPROCESS_REPLACEMENTS.put(",", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\"", "");
 	//DEFAULT_PREPROCESS_REPLACEMENTS.put("", "");
-	
+    
 	DEFAULT_BREAKS_BETWEEN_WORDS = new ArrayList<>();
 	DEFAULT_BREAKS_BETWEEN_WORDS.add(" ");
 	
@@ -167,9 +167,13 @@ public class Capstone {
         }
         
         //TODO:  a better way of handling it than removing
-        for(String s : toRemove) {
+        /*for(String s : toRemove) {
             text = text.replace(s, "");
-        }
+        }*/
+	//TODO: unit test this
+	for(String s : request.getReplacements().keySet()) {
+	    text = text.replace(s, request.getReplacements().get(s));
+	}
         String regex = "[";
         for(String s : breaks) {
             regex += s;
@@ -257,7 +261,7 @@ public class Capstone {
     
     
     
-    public void sampleLinesFromFile(String inputFile, String outputFile, double probability) {
+    public static void sampleLinesFromFile(String inputFile, String outputFile, double probability) {
         BufferedReader reader = null;
         PrintWriter writer = null;
         try {
@@ -534,7 +538,7 @@ public class Capstone {
                     if(words == null) {
                         continue;
                     }
-                    allWords.addAll(Arrays.asList(words));
+                    allWords.addAll(Arrays.asList(words));//TODO: why are we using a separate list here instead of adding it straight into the histogram?
                     wordCount += words.length;
                 }
             }
@@ -597,29 +601,20 @@ public class Capstone {
 	    return matrix;
 	}
 	List<String> sentences = readSentencesFromFile(request.getFilename());
-	List<String> wordsInSentence = null;
-	//List<String> wordSeparators = 
-	for(String sentence : sentences) {
-	    wordsInSentence = Capstone.tokenize(sentence, request);
-	    System.out.println(sentence);
-	    System.out.println(wordsInSentence);
-	    matrix.addAll(findWordMatrix(wordsInSentence));
-	}
-	return matrix;
+	return findWordMatrixFromSentenceList(sentences, request);
     }
     
-    //TODO: unit test
-    public static WordMatrix findWordMatrixFromSentenceList(List<String> sentences) {
+    //does not currently remove punctuation
+    public static WordMatrix findWordMatrixFromSentenceList(List<String> sentences, Request request) {
 	WordMatrix matrix = new WordMatrix();
 	if(sentences == null) {
 	    return matrix;
 	}
 	List<String> wordsInSentence = null;
-	//List<String> wordSeparators = 
 	for(String sentence : sentences) {
-	    wordsInSentence = Capstone.tokenize(sentence, new Request(sentence).setRemoveStopWords(false));
-	    System.out.println(sentence);
-	    System.out.println(wordsInSentence);
+	    wordsInSentence = Capstone.tokenize(sentence, request);
+	    //System.out.println(sentence);
+	    //System.out.println(wordsInSentence);
 	    matrix.addAll(findWordMatrix(wordsInSentence));
 	}
 	return matrix;
