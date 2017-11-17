@@ -23,8 +23,9 @@ public class Request {
     
     private boolean removeStopWords;
     private boolean binaryAssociationsOnly;	//whether or not word assocations should keep track of the count, or just that one exists
+    private boolean tokenizeOnSentenceBreaks;
     
-    public Request(String filename, List<String> wordBreaks, List<String> sentenceBreaks, StopWords stopWords, Map<String, String> replacements, boolean removeStopWords, boolean binaryAssociationOnly) {
+    public Request(String filename, List<String> wordBreaks, List<String> sentenceBreaks, StopWords stopWords, Map<String, String> replacements, boolean removeStopWords, boolean binaryAssociationsOnly) {
 	this.filename = filename;
 	this.wordBreaks = wordBreaks;
 	this.sentenceBreaks = sentenceBreaks;
@@ -91,4 +92,24 @@ public class Request {
 	this.removeStopWords = removeStopWords;
 	return this;
     }
+
+    //TODO: Find a better name for this.
+    public boolean useBinaryAssociationsOnly() {
+	return binaryAssociationsOnly;
+    }
+
+    public Request setBinaryAssociationsOnly(boolean binaryAssociationsOnly) {
+	this.binaryAssociationsOnly = binaryAssociationsOnly;
+	return this;
+    }
+
+    public boolean shouldTokenizeOnSentenceBreaks() {
+	return tokenizeOnSentenceBreaks;
+    }
+
+    public Request setTokenizeOnSentenceBreaks(boolean tokenizeOnSentenceBreaks) {
+	this.tokenizeOnSentenceBreaks = tokenizeOnSentenceBreaks;
+	return this;
+    }
+    
 }

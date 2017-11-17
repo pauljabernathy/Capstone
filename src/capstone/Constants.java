@@ -13,6 +13,7 @@ package capstone;
 public class Constants {
     
     public static final boolean DEFAULT_SHOULD_REMOVE_STOP_WORDS = true;
-    public static final boolean DEFAULT_BINARY_ASSOCIATIONS_ONLY = true;
+    public static final boolean DEFAULT_BINARY_ASSOCIATIONS_ONLY = false;
+    public static final boolean TOKENIZE_ON_SENTENCE_BREAKS = false;
     
 }

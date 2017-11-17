@@ -66,7 +66,7 @@ public class CapstoneTest {
         try {
             List<String> result = Capstone.readLinesFromFile(filename);
             result = result.stream().limit(20).collect(toList());
-            assertEquals(17, result.size());
+            assertEquals(12, result.size());
             for(String s : result) {
                 logger.debug(s);
             }
@@ -118,70 +118,63 @@ public class CapstoneTest {
     public void testTokenize() {
         logger.info("\ntesting split()");
         List<String> sentenceBreaks = Arrays.asList(".", "!", "?");
-	Request request = new Request("").setSentenceBreaks(sentenceBreaks).setRemoveStopWords(false);
         String text = null;
-        //String [] splits = null;
-	List<String> splits = null;
+        String [] splits = null;
 
-        splits = Capstone.tokenize(text, request);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         if(splits == null) {
             fail("splits was null when it should have been empty but non null");
         }
-        assertEquals(0, splits.size());
+        assertEquals(0, splits.length);
 
         text = "";
-        splits = Capstone.tokenize(text, request);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         if(splits == null) {
             fail("splits was null when it should have been empty but non null");
         }
         Arrays.asList(splits).stream().forEach(System.out::println);
-        assertEquals(0, splits.size());
+        assertEquals(0, splits.length);
 
         text = "And then I said no.  But why?  How dumb was that!  oh well";
-        splits = Capstone.tokenize(text, request.setTokenizeOnSentenceBreaks(true));
-        assertEquals(4, splits.size());
-        //Arrays.asList(splits).stream().forEach(s -> s = s.replace("\t", ""));
+        splits = Capstone.tokenize(text, sentenceBreaks);
+        assertEquals(4, splits.length);
+        Arrays.asList(splits).stream().forEach(s -> s = s.replace("\t", ""));
         Arrays.asList(splits).stream().forEach(System.out::println);
 
         text = "There is only one sentence here so ha.";
-        splits = Capstone.tokenize(text, request);
-        assertEquals(1, splits.size());
+        splits = Capstone.tokenize(text, sentenceBreaks);
+        assertEquals(1, splits.length);
 
         text = "There is only one sentence here so ha";
-        splits = Capstone.tokenize(text, request);
-        assertEquals(1, splits.size());
+        splits = Capstone.tokenize(text, sentenceBreaks);
+        assertEquals(1, splits.length);
 
-        request = null;
-        splits = Capstone.tokenize(text, request);
-        assertEquals(1, splits.size());
+        sentenceBreaks = null;
+        splits = Capstone.tokenize(text, sentenceBreaks);
+        assertEquals(1, splits.length);
 
-        request = new Request("").setSentenceBreaks(new ArrayList<>()).setRemoveStopWords(false).setTokenizeOnSentenceBreaks(true);
-        splits = Capstone.tokenize(text, request);
-	logger.debug(splits);
-        assertEquals(1, splits.size());
+        sentenceBreaks = new ArrayList<>();
+        splits = Capstone.tokenize(text, sentenceBreaks);
+        assertEquals(1, splits.length);
         
-        request.setSentenceBreaks(Capstone.DEFAULT_SENTENCE_BREAKS);
+        sentenceBreaks = Arrays.asList(".", "!", "?");
         text = "We need to handle the elipsis correctly...  Yes we do.";
-        splits = Capstone.tokenize(text, request);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         Arrays.asList(splits).stream().forEach(System.out::println);
-        assertEquals(2, splits.size());
-	//TODO: a final determination on what to do with ... and implement it.
+        assertEquals(1, splits.length);
         
         text = "We need to handle the elipsis correctly....  Yes we do";
-        splits = Capstone.tokenize(text, request);
+        splits = Capstone.tokenize(text, sentenceBreaks);
         Arrays.asList(splits).stream().forEach(System.out::println);
-        assertEquals(2, splits.size());
+        assertEquals(2, splits.length);
 	
 	text = "one two threefour five";
-	request.setSentenceBreaks(new ArrayList<>());
-	request.getSentenceBreaks().add(" ");
-	request.setTokenizeOnSentenceBreaks(true);
-	request.setRemoveStopWords(true);
-	splits = Capstone.tokenize(text, request);
-	logger.debug(toolbox.util.ListArrayUtil.listToString(splits));
-	assertEquals(1, splits.size());
-	splits = Capstone.tokenize(text, request.setRemoveStopWords(false));
-	assertEquals(4, splits.size());
+	sentenceBreaks = new ArrayList<>();
+	sentenceBreaks.add(" ");
+	splits = Capstone.tokenize(text, sentenceBreaks);
+	logger.debug(toolbox.util.ListArrayUtil.arrayToString(splits));
+	//assertEquals(4, splits.length);
+	assertEquals(1, splits.length);	//now it is 1 because this function removes stopwords by default, so it removes "one" "two" and "five"
 	
 	text = "one two three four";
 	List<String> tokens = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));//Capstone.DEFAULT_BREAKS_BETWEEN_WORDS);
@@ -234,6 +227,20 @@ public class CapstoneTest {
         text = "one two three four five six";
         result = Capstone.getWordPairSeparationss(text);
         assertEquals(15, result.get().size());
+    }
+    
+    private void testRegularSplitting() {
+        doOneSplit("one", " ");
+        doOneSplit("one", "");
+        doOneSplit("one two", " ");
+        doOneSplit("one two", "");
+    }
+    
+    private void doOneSplit(String text, String sep) {
+        String[] words = text.split(sep);
+        System.out.println("\n_" + text + "_   _" + sep + "_");
+        System.out.println(words.length);
+        Arrays.asList(words).stream().forEach(System.out::println);
     }
     
     @Test
@@ -294,6 +301,24 @@ public class CapstoneTest {
         logger.debug(result.get(5).getAsList(toolbox.stats.TreeHistogram.Sort.ITEM));
     }
     
+    //@Test
+    public void testGetWordPairSepHistogramsFromLargeFile() {
+        logger.info("\ntesting getWordPairSepHistogramsFromFile(), from one of the larger data files");
+        Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
+        String filename = "blogsSample1.txt";
+        try {
+            result = Capstone.getWordPairSepHistogramsFromFile(filename);
+            logger.info(result.size());
+            logger.info(result.get(1).getTotalCount());
+            logger.info(result.get(2).getTotalCount());
+            logger.info(result.get(3).getTotalCount());
+            logger.info(result.get(4).getTotalCount());
+            logger.info(result.get(5).getTotalCount());
+        } catch(IOException e) {
+            fail(e.getClass() + " trying to read " + filename + ":  " + e.getMessage());
+        }
+    }
+    
     private Map<Integer, TreeHistogram<WordPairSeparation>> testGetWordPairSepHistogramsFromOneFile(String filename, int expectedCount) {
         System.out.println();
         Map<Integer, TreeHistogram<WordPairSeparation>> result = null;
@@ -310,14 +335,28 @@ public class CapstoneTest {
     //@Test
     public void testampleLinesFromFile() {
         logger.info("\ntesting sampleLinesFromFile()");
-        //TODO: fill in
+        //instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample1.txt", .001);
+        //instance.sampleLinesFromFile("/Users/pabernathy/coursera/datascience/final/en_US/en_US.news.txt", "/Users/pabernathy/coursera/datascience/final/en_US/newsSample1.txt", .001);
+        //instance.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.twitter.txt", "twitterSample5.txt", .75);
+        //instance.sampleLinesFromFile("/Users/pabernathy/coursera/datascience/final/en_US/en_US.twitter.txt", "/Users/pabernathy/coursera/datascience/final/en_US/twitterSample2.txt", .0001);
+        
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample1.txt", .1);
+        /*Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample2.txt", .33);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample3.txt", .5);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample4.txt", .66);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.blogs.txt", "blogsSample5.txt", .75);
+        
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample1.txt", .1);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample2.txt", .33);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample3.txt", .5);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample4.txt", .66);
+        Capstone.sampleLinesFromFile("C:/Users/paul/Coursera/datascience/capstone/en_US.news.txt", "newsSample5.txt", .75);*/
     }
     
     /**
      * Test of findLongestLine method, of class Capstone.
      */
     //@Test
-    //TODO
     public void testFindLongestLine() {
         logger.info("findLongestLine");
         String filename = "";
@@ -334,21 +373,19 @@ public class CapstoneTest {
     @Test
     public void testFindNumOccurrences() {
         logger.info("findNumOccurrences");
-        String filename = "word_pair_test2.txt";
-        String pattern = "one";
-        int expResult = 2;
+        String filename = "/Users/pabernathy/coursera/datascience/final/en_US/twitterSample1.txt";
+        String pattern = " the";
+        int expResult = 895;
         int result = Capstone.findNumOccurrences(filename, pattern);
         assertEquals(expResult, result);
-	//TODO: determine why findNumOccurrences found ~300 less occurrences of "the" in beowolf than the file summary method
     }
 
     /**
      * Test of findLinesThatContain method, of class Capstone.
      */
-    //@Test
+    @Test
     public void testFindLinesThatContain() {
         logger.info("findLinesThatContain");
-	//TODO: a small file
         String filename = "blogsSample2_4grams.txt";
         String pattern = "a case of";
         List<String> expResult = null;
@@ -377,6 +414,19 @@ public class CapstoneTest {
         result = result.stream().sorted().collect(java.util.stream.Collectors.toList());
         logger.debug(result);
         
+        filename = "blogsSample5_5grams.txt";
+        filename = "newsSample5_5grams.txt";
+        result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("a case of"));
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("it would mean the"));
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("make me the"));
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("struggling but the"));  //NPE - empty results
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("romantic date at the"));
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("and be on my"));
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("it in quite some"));      //no results
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("eyes with his little"));
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("the faith during the"));      //empty results
+        //result = Capstone.findLinesThatMatch(filename, s -> s.startsWith("then you must be"));
+        
         result = result.stream().sorted().collect(java.util.stream.Collectors.toList());
         StringHistogram hist = new StringHistogram();
         result.stream().forEach(s -> hist.insert(s));
@@ -387,11 +437,10 @@ public class CapstoneTest {
     /**
      * Test of wordCould method, of class Capstone.
      */
-    //@Test
-    //TODO: unit test with a small file
+    @Test
     public void testWordCount() {
         logger.info("wordCount");
-        String filename = "twitterSample1.txt";
+        String filename = "/Users/pabernathy/coursera/datascience/final/en_US/twitterSample1.txt";
         Histogram expResult = null;
         Histogram result = Capstone.wordCount(filename);
         if(result == null) {
@@ -422,24 +471,152 @@ public class CapstoneTest {
 	assertFalse(result.contains(","));
 	assertFalse(result.contains("clear,\""));
 	
+        /*result = Capstone.readFileAsStrings("test1.txt", " ");
+        assertEquals(5, result.size());
+        result.stream().forEach(System.out::println);
+        
+        result = Capstone.readFileAsStrings("/Users/pabernathy/coursera/datascience/final/en_US/twitterSample1.txt", " ");
+        System.out.println("twitterSample1.txt:  " + result.size());
+        assertEquals(895, result.stream().filter(word -> word.equals("the")).count());
+        assertEquals(9696, result.stream().distinct().count());
+        
+        System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
+        System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("I")).count());
+        System.out.println("a:  " + result.stream().filter(word -> word.equals("a")).count());
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("for")).count());
+        
+        System.out.println();
+        //result = result.stream().forEach(n -> n.toLowerCase()).collect(Collectors.toList());  //forEach returns void, so you have to use map instead
+        result.stream().limit(5).forEach(System.out::println);
+        result = result.stream().map(n -> n.toLowerCase()).collect(Collectors.toList());
+        System.out.println(result.stream().distinct().count());
+        System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
+        System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
+        System.out.println("i:  " + result.stream().filter(word -> word.equals("i")).count());
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("I")).count());
+        System.out.println("a:  " + result.stream().filter(word -> word.equals("a")).count());
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("for")).count());*/
+        
+        /*result = Capstone.readFileAsStrings("/Users/pabernathy/coursera/datascience/final/en_US/en_US.blogs.txt", " ");
+        System.out.println("en_US.blogs.txt:  " + result.size());
+        result = Capstone.readFileAsStrings("/Users/pabernathy/coursera/datascience/final/en_US/en_US.news.txt", " ");
+        System.out.println("en_US.news.txt:  " + result.size());
+        result = Capstone.readFileAsStrings("/Users/pabernathy/coursera/datascience/final/en_US/en_US.twitter.txt", " ");
+        System.out.println("en_US.twitter.txt:  " + result.size());/**/
+        
+        /**result = Capstone.readFileAsStrings("/Users/pabernathy/twitterSample2.txt", " ");
+        System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
+        System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
+        System.out.println("i:  " + result.stream().filter(word -> word.equals("i")).count());
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("I")).count());
+        System.out.println("a:  " + result.stream().filter(word -> word.equals("a")).count());
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("for")).count());
+        
+        System.out.println();
+        result = result.stream().map(n -> n.toLowerCase()).collect(Collectors.toList());/**/
+        /*System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
+        System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
+        System.out.println("i:  " + result.stream().filter(word -> word.equals("i")).count());
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("I")).count());
+        System.out.println("a:  " + result.stream().filter(word -> word.equals("a")).count());
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("for")).count());*/
+        /*System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
+        System.out.println(showWordTotal(result, "the"));
+        System.out.println("The:  " + result.stream().filter(word -> word.equals("The")).count());
+        System.out.println(showWordTotal(result, "The"));
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
+        System.out.println(showWordTotal(result, "to"));
+        System.out.println("i:  " + result.stream().filter(word -> word.equals("i")).count());
+        System.out.println(showWordTotal(result, "i"));
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("I")).count());
+        System.out.println(showWordTotal(result, "I"));
+        System.out.println("a:  " + result.stream().filter(word -> word.equals("a")).count());
+        System.out.println(showWordTotal(result, "a"));
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("for")).count());
+        System.out.println(showWordTotal(result, "for"));*/
+        
+        /*System.out.println("the:  " + result.stream().filter(word -> word.equals("the")).count());
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("to")).count());
+        System.out.println("i:  " + result.stream().filter(word -> word.equals("i")).count());
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("you")).count());
+        System.out.println("a:  " + result.stream().filter(word -> word.equals("a")).count());
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("in")).count());
+        System.out.println("The:  " + result.stream().filter(word -> word.equals("for")).count());
+        System.out.println("to:  " + result.stream().filter(word -> word.equals("of")).count());
+        System.out.println("i:  " + result.stream().filter(word -> word.equals("and")).count());
+        System.out.println("I:  " + result.stream().filter(word -> word.equals("is")).count());
+        System.out.println("a:  " + result.stream().filter(word -> word.equals(" ")).count());
+        System.out.println("for:  " + result.stream().filter(word -> word.equals("that")).count());*/
+        
+        /**System.out.println(showWordTotal(result, "the"));
+        System.out.println(showWordTotal(result, "to"));
+        System.out.println(showWordTotal(result, "i"));
+        System.out.println(showWordTotal(result, "you"));
+        System.out.println(showWordTotal(result, "a"));
+        System.out.println(showWordTotal(result, "in"));
+        System.out.println(showWordTotal(result, "for"));
+        System.out.println(showWordTotal(result, "of"));
+        System.out.println(showWordTotal(result, "and"));
+        System.out.println(showWordTotal(result, "is"));
+        System.out.println(showWordTotal(result, " "));
+        System.out.println(showWordTotal(result, "...in"));
+        System.out.println(showWordTotal(result, "in."));
+        System.out.println(result.stream().distinct().count());/**/
     }
     
     public String showWordTotal(List<String> result, String word) {
         return new StringBuilder().append(word).append(":  ").append(result.stream().filter(n -> n.equals(word)).count()).toString();
     }
     
-    //@Test
+    @Test
     public void testFileSummaryHistogram() {
         logger.info("\nfileSummaryHistogram");
         Histogram result = null;
-        result = null;
-	//TODO: a test file
+        result = Capstone.fileSummaryHistogram("/Users/pabernathy/coursera/datascience/final/en_US/en_US.blogs.txt", " ");
+        System.out.println(result.getLabel());
+        System.out.println(result);
+        
+        result = Capstone.fileSummaryHistogram("/Users/pabernathy/coursera/datascience/final/en_US/en_US.news.txt", " ");
+        System.out.println(result.getLabel());
+        System.out.println(result);
+        
+        result = Capstone.fileSummaryHistogram("/Users/pabernathy/coursera/datascience/final/en_US/en_US.twitter.txt", " ");
+        System.out.println(result.getLabel());
+        System.out.println(result);
+        
+        result = Capstone.fileSummaryHistogram("/Users/pabernathy/coursera/datascience/final/en_US/twitterSample1.txt", " ");
+        System.out.println(result.getLabel());
+        System.out.println(result);
     }
     
-    //@Test
+    @Test
     public void testFileSummary() {
         logger.info("\nfileSummary");
-        //TODO
+        List<String> result = null;
+        /**result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/en_US.blogs.txt", " ");
+        System.out.println("en_US.blogs.txt:  " + result);
+        
+        result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/blogsSample1.txt", " ");
+        System.out.println("blogsSample1.txt:  " + result);
+        
+        result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/en_US.news.txt", " ");
+        System.out.println("en_US.news.txt:  " + result);
+        
+        result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/newsSample1.txt", " ");
+        System.out.println("newsSample1.txt:  " + result);
+        
+        result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/en_US.twitter.txt", " ");
+        System.out.println("en_US.twitter.txt:  " + result);
+        /**/
+        //result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/twitterSample1.txt", " ");
+        //System.out.println("twitterSample1.txt:  " + result);
+        result = Capstone.fileSummary("/Users/pabernathy/coursera/datascience/final/en_US/twitterSample2.txt", " ");
+        System.out.println("twitterSample2.txt:  " + result);
     }
     
     @Test
@@ -448,19 +625,26 @@ public class CapstoneTest {
         TreeHistogram<String> hist = null;
         /*hist = Capstone.fileSummaryTreeHistogram("../Toolbox/jabberwocky.txt", " ");
         hist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(10).forEach(System.out::println);
-        */
-	//TODO
-	hist = Capstone.fileSummaryTreeHistogram(new Request("word_pair_test2.txt").setRemoveStopWords(false));
-	//logger.debug(hist.getAsList());
-	hist.getAsList().forEach(System.out::println);
-	assertEquals(3, hist.get("one").get().count);
-	assertEquals(2, hist.get("two").get().count);
-	assertEquals(2, hist.get("three").get().count);
-	assertEquals(1, hist.get("four").get().count);
-	assertEquals(1, hist.get("five").get().count);
-	assertEquals(1, hist.get("six").get().count);
-	assertEquals(1, hist.get("seven").get().count);
-	assertEquals(1, hist.get("eight").get().count);
+        System.out.println("\n Les Mis");
+        hist = Capstone.fileSummaryTreeHistogram("../Toolbox/les_miserables.txt", " ");
+        hist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(10).forEach(System.out::println);*/
+        
+        //this.doTreeHistogram("twitterSample5.txt");
+        //this.doTreeHistogram("en_US.twitter.txt");
+        
+        //this.doTreeHistogram("newsSample1.txt");
+        //this.doTreeHistogram("newsSample2.txt");
+        //this.doTreeHistogram("newsSample3.txt");
+        //this.doTreeHistogram("newsSample4.txt");
+        //this.doTreeHistogram("newsSample5.txt");
+        
+        /*this.doTreeHistogram("blogsSample1.txt");
+        this.doTreeHistogram("blogsSample2.txt");
+        this.doTreeHistogram("blogsSample3.txt");
+        this.doTreeHistogram("blogsSample4.txt");
+        this.doTreeHistogram("blogsSample5.txt");*/
+	
+	this.doTreeHistogram("through_the_looking_glass.txt");
     }
     
     private void doTreeHistogram(String filename) {
@@ -498,11 +682,6 @@ public class CapstoneTest {
 	assertEquals(3, result.getAllAssociationsFor("preach").size());
 	assertEquals(4, this.getAssociationCount(result, "preach"));
 	
-	result = Capstone.findWordMatrix(input, true);
-	assertEquals(3, result.getAllAssociationsFor("the").size());
-	assertEquals(3, this.getAssociationCount(result, "the"));
-	assertEquals(3, result.getAllAssociationsFor("preach").size());
-	assertEquals(3, this.getAssociationCount(result, "preach"));
 	
 	String sentence = "one two three four";
 	String[] wordsInSentence = "one two three four".split(" ");//Capstone.tokenize(sentence, DEFAULT_BREAKS_BETWEEN_WORDS);
@@ -532,19 +711,12 @@ public class CapstoneTest {
 	WordMatrix matrix = Capstone.findWordMatrix(words);
 	assertEquals(2, matrix.getAllAssociationsFor("one").size());
 	assertEquals(5, this.getAssociationCount(matrix, "one"));
+	System.out.println(matrix.getAllAssociationsFor("two"));
 	assertEquals(2, matrix.getAllAssociationsFor("two").size());
 	assertEquals(8, this.getAssociationCount(matrix, "two"));
+	System.out.println(matrix.getAllAssociationsFor("three"));
 	assertEquals(2, matrix.getAllAssociationsFor("three").size());
 	assertEquals(9, this.getAssociationCount(matrix, "three"));
-	
-	//now with just one association per sentence
-	matrix = Capstone.findWordMatrix(words, new Request("").setBinaryAssociationsOnly(true));
-	assertEquals(2, matrix.getAllAssociationsFor("one").size());
-	assertEquals(2, this.getAssociationCount(matrix, "one"));
-	assertEquals(2, matrix.getAllAssociationsFor("two").size());
-	assertEquals(2, this.getAssociationCount(matrix, "two"));
-	assertEquals(2, matrix.getAllAssociationsFor("three").size());
-	assertEquals(2, this.getAssociationCount(matrix, "three"));
     }
     
     private int getAssociationCount(WordMatrix matrix, String word) {
@@ -605,31 +777,6 @@ public class CapstoneTest {
 	    result = Capstone.findWordMatrixFromFile(new Request("word_pair_test2.txt").setRemoveStopWords(false));
 	    //result.getAllAssociationsFor("one").forEach(System.out::println);
 	    assertEquals(5, result.getAllAssociationsFor("one").size());
-	    assertEquals(12, this.getAssociationCount(result, "one"));
-	    
-	    //result.getAllAssociationsFor("three").forEach(System.out::println);
-	    assertEquals(5, result.getAllAssociationsFor("three").size());
-	    assertEquals(8, this.getAssociationCount(result, "three"));
-	    
-	    //result.getAllAssociationsFor("five").forEach(System.out::println);
-	    assertEquals(5, result.getAllAssociationsFor("five").size());
-	    assertEquals(6, this.getAssociationCount(result, "five"));
-	    
-	    //result.getAllAssociationsFor("seven").forEach(System.out::println);
-	    assertEquals(1, result.getAllAssociationsFor("seven").size());
-	    assertEquals(1, this.getAssociationCount(result, "seven"));
-	    //result.getAllAssociationsFor("eight").forEach(System.out::println);
-	    assertEquals(1, result.getAllAssociationsFor("eight").size());
-	    assertEquals(1, this.getAssociationCount(result, "eight"));
-	} catch(IOException e) {
-	    fail(e.getClass() + " trying to get WordMatrix for word_pair_test_2.txt");
-	}/**/
-	
-	//now with one association per sentence
-	try {
-	    result = Capstone.findWordMatrixFromFile(new Request("word_pair_test2.txt").setRemoveStopWords(false).setBinaryAssociationsOnly(true));
-	    //result.getAllAssociationsFor("one").forEach(System.out::println);
-	    assertEquals(5, result.getAllAssociationsFor("one").size());
 	    assertEquals(7, this.getAssociationCount(result, "one"));
 	    
 	    //result.getAllAssociationsFor("three").forEach(System.out::println);
@@ -648,7 +795,7 @@ public class CapstoneTest {
 	    assertEquals(1, this.getAssociationCount(result, "eight"));
 	} catch(IOException e) {
 	    fail(e.getClass() + " trying to get WordMatrix for word_pair_test_2.txt");
-	}
+	}/**/
     }
     
     @Test
@@ -666,30 +813,10 @@ public class CapstoneTest {
 	    fail("result should not have been null");
 	}
 	
-	sentences.add("one two three four five six one");
+	sentences.add("one two three four five six");
 	sentences.add("seven eight");
 	sentences.add("one two three");
 	result = Capstone.findWordMatrixFromSentenceList(sentences, new Request("").setRemoveStopWords(false));
-	assertEquals(5, result.getAllAssociationsFor("one").size());
-	assertEquals(12, this.getAssociationCount(result, "one"));
-
-	//result.getAllAssociationsFor("three").forEach(System.out::println);
-	assertEquals(5, result.getAllAssociationsFor("three").size());
-	assertEquals(8, this.getAssociationCount(result, "three"));
-
-	//result.getAllAssociationsFor("five").forEach(System.out::println);
-	assertEquals(5, result.getAllAssociationsFor("five").size());
-	assertEquals(6, this.getAssociationCount(result, "five"));
-
-	//result.getAllAssociationsFor("seven").forEach(System.out::println);
-	assertEquals(1, result.getAllAssociationsFor("seven").size());
-	assertEquals(1, this.getAssociationCount(result, "seven"));
-	//result.getAllAssociationsFor("eight").forEach(System.out::println);
-	assertEquals(1, result.getAllAssociationsFor("eight").size());
-	assertEquals(1, this.getAssociationCount(result, "eight"));
-	
-	//Now with one association per sentence
-	result = Capstone.findWordMatrixFromSentenceList(sentences, new Request("").setRemoveStopWords(false).setBinaryAssociationsOnly(true));
 	assertEquals(5, result.getAllAssociationsFor("one").size());
 	assertEquals(7, this.getAssociationCount(result, "one"));
 

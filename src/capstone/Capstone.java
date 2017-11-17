@@ -13,7 +13,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-//import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toList;
 import toolbox.random.Random;
 import toolbox.stats.*;
 import java.util.function.Predicate;
@@ -26,6 +26,7 @@ import toolbox.util.ListArrayUtil;
 //Some inconsistency here, since giving a non empty name of a file that does not exist results in an IOException
 //but a null or empty value for filename just returns empty results in several of these methods.
 
+//TODO:  Consolidate file reading into one or two methods.
 
 /**
  *
@@ -49,6 +50,7 @@ public class Capstone {
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\n", " ");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put(",", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\"", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("!", "");
 	//DEFAULT_PREPROCESS_REPLACEMENTS.put("", "");
     
 	DEFAULT_BREAKS_BETWEEN_WORDS = new ArrayList<>();
@@ -139,26 +141,24 @@ public class Capstone {
      * @param text The text to tokenize
      * @param breaks The list of characters or string to use as separators.
      * @return 
+     * @deprecated 
      */
     public static String[] tokenize(String text, List<String> breaks) {
         //return tokenize(text, breaks, Arrays.asList("...")).toArray(new String[] {});
-	return tokenize(text, new Request("").setWordBreaks(breaks).setRemoveStopWords(true), Arrays.asList("...")).toArray(new String[] {});
+	return tokenize(text, new Request("").setWordBreaks(breaks).setRemoveStopWords(true)).toArray(new String[] {});
     }
     
     //TODO:  Get that Arrays.asList("...") out of there.
     public static List<String> tokenize(String text, Request request) {
-	return tokenize(text, request, Arrays.asList("..."));
-    }
-    
-    public static List<String> tokenize(String text, Request request, List<String> toRemove) {
-	//System.out.println("tokenize " + request.shouldRemoveStopWords());
-	//System.out.println(text);
-	//System.out.println(request.getStopWords().isStopWord("the"));
-	List<String> breaks = request.getWordBreaks();
         List<String> result = new ArrayList<>();
         if(text == null || text.length() == 0) {
             return result;
         }
+	if(request == null) {
+	    result.add(text);
+	    return result;
+	}
+	List<String> breaks = request.shouldTokenizeOnSentenceBreaks() ? request.getSentenceBreaks() : request.getWordBreaks();
         if(breaks == null || breaks.isEmpty()) {
             //result = new String[1];
             //result[0] = text;
@@ -534,7 +534,11 @@ public class Capstone {
                 line = reader.readLine();
                 lineCount++;
                 if(line != null && !"".equals(line)) {
-                    words = Capstone.tokenize(line, request, Arrays.asList("...")).toArray(new String[] {});
+		    line = line.toLowerCase().trim();
+		    for(String toReplace : DEFAULT_PREPROCESS_REPLACEMENTS.keySet()) {
+			line = line.replaceAll(toReplace, DEFAULT_PREPROCESS_REPLACEMENTS.get(toReplace));
+		    }
+                    words = Capstone.tokenize(line, request).toArray(new String[] {});
                     if(words == null) {
                         continue;
                     }
@@ -542,6 +546,27 @@ public class Capstone {
                     wordCount += words.length;
                 }
             }
+        } catch(IOException e) {
+            System.err.println(e.getClass() + " in fileSummaryHistogram(" + request.getFilename() + "):  " + e.getMessage());
+        }
+        allWords.stream().forEach(word -> hist.insert(word, 1));
+        return hist;
+    }
+    
+    public static TreeHistogram fileSummaryTreeHistogram2(Request request) {
+        List<String> allWords = new ArrayList<>();
+        int lineCount = 0;
+        int wordCount = 0;
+        TreeHistogram<String> hist = new TreeHistogram<String>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(request.getFilename()))) {
+	    List<String> sentences = Capstone.readSentencesFromFile(request);
+            for(String sentence : sentences) {
+		List<String> words = Capstone.tokenize(sentence, request);
+		if(request.useBinaryAssociationsOnly()) {
+		    words = words.stream().distinct().collect(toList());
+		}
+		words.forEach(word -> hist.insert(word, 1));
+	    }
         } catch(IOException e) {
             System.err.println(e.getClass() + " in fileSummaryHistogram(" + request.getFilename() + "):  " + e.getMessage());
         }
@@ -578,21 +603,44 @@ public class Capstone {
         return result;
     }
     
+    /**
+     * @deprecated
+     * @param words
+     * @return 
+     */
     public static WordMatrix findWordMatrix(String[] words) {
+	return findWordMatrix(words, Constants.DEFAULT_BINARY_ASSOCIATIONS_ONLY);
+    }
+    
+    public static WordMatrix findWordMatrix(String[] words, boolean oncePerSentence) {
 	WordMatrix matrix = new WordMatrix();
 	if(words == null || words.length == 0) { 
 	    return matrix;
 	}
 	for(int i = 0; i < words.length; i++) {
 	    for(int j = i + 1; j < words.length; j++) {
-		matrix.add(words[i], words[j]);
+		if(!oncePerSentence || (oncePerSentence && matrix.get(words[i], words[j]) == 0)) {
+		    matrix.add(words[i], words[j]);
+		}
 	    }
 	}
 	return matrix;
     }
     
-    public static WordMatrix findWordMatrix(List<String> matrix) {
-	return findWordMatrix(matrix.toArray(new String[]{}));
+    /**
+     * @deprecated 
+     * @param words
+     * @return 
+     */
+    public static WordMatrix findWordMatrix(List<String> words) {
+	return findWordMatrix(words.toArray(new String[]{}));
+    }
+    
+    public static WordMatrix findWordMatrix(List<String> words, Request request) {
+	/*if(request.useBinaryAssociationsOnly()) {
+	    words = words.stream().distinct().collect(toList());
+	}*/
+	return findWordMatrix(words.toArray(new String[] {}), request.useBinaryAssociationsOnly());
     }
     
     public static WordMatrix findWordMatrixFromFile(Request request) throws IOException {
@@ -615,7 +663,7 @@ public class Capstone {
 	    wordsInSentence = Capstone.tokenize(sentence, request);
 	    //System.out.println(sentence);
 	    //System.out.println(wordsInSentence);
-	    matrix.addAll(findWordMatrix(wordsInSentence));
+	    matrix.addAll(findWordMatrix(wordsInSentence, request));
 	}
 	return matrix;
     }

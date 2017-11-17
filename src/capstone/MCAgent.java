@@ -23,16 +23,28 @@ public class MCAgent {
     //ex. beta = 2 => There are 1000 sentences. Word A and word B occur once each, in the same sentence.  P(A|B) really 1?  If beta = 2, we pretend we have 2000 prior sentences and have found A and B twice each, but not in the same sentence.
     //=> P(A|B) = 1/3.  If we then find A and B together in the same sentence 10 times, and always together, P(A|B) = 10/12.
     
-    private TreeHistogram<String> wordHist;
+    private TreeHistogram<String> totalAllWordHist;
+    private TreeHistogram<String> totalNonStopWordHist;
+    private TreeHistogram<String> oncePerSentenceWordHist;
     private List<String> sentences;
     private TreeHistogram<String> ngrams;
-    private WordMatrix matrix;
+    private WordMatrix weighedMatrix;
+    private WordMatrix binaryMatrix;
+    
+    private double[] genome;
+    
+    public MCAgent(List<String> sentences) {
+	this.sentences = sentences;
+	//sentences is actually the only true information.  The rest can be calculated from it and are only for speed.
+	//The other objects should be passed in because the MCAgentRunner can calculate it all one for all of the agents.
+	//If this constructor is used, the calling code will either need to use the setters or this class will need to call the appropriate methods in Capstone.
+    }
     
     public MCAgent(TreeHistogram<String> wordHist, List<String> sentences, TreeHistogram<String> ngrams, WordMatrix matrix) {
-	this.wordHist = wordHist;
+	this.totalAllWordHist = wordHist;
 	this.sentences = sentences;
 	this.ngrams = ngrams;
-	this.matrix = matrix;
+	this.weighedMatrix = matrix;
     }
 
     public double getBeta() {
@@ -44,12 +56,30 @@ public class MCAgent {
 	return this;
     }
 
-    public TreeHistogram<String> getWordHist() {
-	return wordHist;
+    public TreeHistogram<String> getTotalAllWordHist() {
+	return totalAllWordHist;
     }
 
-    public MCAgent setWordHist(TreeHistogram<String> wordHist) {
-	this.wordHist = wordHist;
+    public MCAgent setTotalAllWordHist(TreeHistogram<String> wordHist) {
+	this.totalAllWordHist = wordHist;
+	return this;
+    }
+
+    public TreeHistogram<String> getTotalNonStopWordHist() {
+	return totalNonStopWordHist;
+    }
+
+    public MCAgent setTotalNonStopWordHist(TreeHistogram<String> totalNonStopWordHist) {
+	this.totalNonStopWordHist = totalNonStopWordHist;
+	return this;
+    }
+
+    public TreeHistogram<String> getOncePerSentenceWordHist() {
+	return oncePerSentenceWordHist;
+    }
+
+    public MCAgent setOncePerSentenceWordHist(TreeHistogram<String> oncePerSentenceWordHist) {
+	this.oncePerSentenceWordHist = oncePerSentenceWordHist;
 	return this;
     }
 
@@ -71,14 +101,24 @@ public class MCAgent {
 	return this;
     }
 
-    public WordMatrix getMatrix() {
-	return matrix;
+    public WordMatrix getWeightedMatrix() {
+	return weighedMatrix;
     }
 
-    public MCAgent setMatrix(WordMatrix matrix) {
-	this.matrix = matrix;
+    public MCAgent setWeightedMatrix(WordMatrix matrix) {
+	this.weighedMatrix = matrix;
 	return this;
     }
+
+    public WordMatrix getBinaryMatrix() {
+	return binaryMatrix;
+    }
+
+    public void setBinaryMatrix(WordMatrix binaryMatrix) {
+	this.binaryMatrix = binaryMatrix;
+    }
+    
+    
 
     /**
      * Does one run of the simulation
@@ -109,14 +149,14 @@ public class MCAgent {
 		for(String token: tokens) {
 		    System.out.println(token + " " + this.getFractionOfWords(token));
 		    //System.out.println(sentenceWordMatrix.getAllAssociationsFor(token));
-		    List<WordPairAssociation> associations = matrix.getAllAssociationsFor(token);
-		    System.out.println(matrix.getAllAssociationsFor(token));
+		    List<WordPairAssociation> associations = weighedMatrix.getAllAssociationsFor(token);
+		    System.out.println(weighedMatrix.getAllAssociationsFor(token));
 		    
 		    //Find the words with the highest probability to appear in the same sentence as word "token."
 		    for(WordPairAssociation wpa : associations) {
 			String other = wpa.getOther(token).get();
 			System.out.println(other + " " + wpa.getCount() + " " + this.probAInSentenceWithB(other, token) + " " + this.probAInSentenceWithB(token, other));
-			System.out.println(this.probAGivenB(other, token));
+			System.out.println(this.probAInSentenceGivenB(other, token));
 		    }
 		}
 	    }
@@ -138,7 +178,7 @@ public class MCAgent {
 	//So if they occur once in the document in the same sentence, it is 1.0.  If they occur twice, but two times within that same sentence,
 	//you get 2.0.  If you are looking at just the probability that they occur in the same sentence, this seems incorrect.  Maybe.
 	//But for now let's try it.  Again, our probability of A given B is sortof a best guess anyway.
-	int numAandB = this.matrix.get(a, b);
+	int numAandB = this.binaryMatrix.get(a, b);
 	return (double)numAandB / (double)(this.sentences.size() * (1.0 + this.beta));
     }
     
@@ -148,7 +188,7 @@ public class MCAgent {
      * @param b
      * @return 
      */
-    protected double probAGivenB(String a, String b) {
+    protected double probAInSentenceGivenB(String a, String b) {
 	//TODO: some data structure to keep track of how often a word appears in a sentence?  For now, just estimate with 
 	//#occurences of B divided by total number of words.
 	return this.probAInSentenceWithB(a, b) / this.getFractionOfWords(b);	//this.getFractionOfWords(b) represent prob(b)
@@ -159,18 +199,27 @@ public class MCAgent {
     
     
     protected double getFractionOfWords(String b) {
-	//return this.wordHist.queryFromFirst(word -> word.equals(b)).size() / this.wordHist.getTotalCount();
-	/*List<HistogramEntry<String>> entries = this.wordHist.queryAll(word -> word.equals(b));
+	//return this.totalAllWordHist.queryFromFirst(word -> word.equals(b)).size() / this.totalAllWordHist.getTotalCount();
+	/*List<HistogramEntry<String>> entries = this.totalAllWordHist.queryAll(word -> word.equals(b));
 	if(entries.isEmpty()) {
 	    return 0.0;
 	} else {
-	    return (double) entries.get(0).count / (double) this.wordHist.getTotalCount();
+	    return (double) entries.get(0).count / (double) this.totalAllWordHist.getTotalCount();
 	}*/
-	Optional<HistogramEntry<String>> entry = this.wordHist.findFirst(word -> word.equals(b));
-	if(!entry.isPresent()) {
-	    return 0.0;
+	Optional<HistogramEntry<String>> entry = this.totalAllWordHist.get(b);
+	if(entry.isPresent()) {
+	    return (double)entry.get().count / (double) this.totalAllWordHist.getTotalCount();
 	} else {
-	    return (double)entry.get().count / (double) this.wordHist.getTotalCount();
+	    return 0.0;
+	}
+    }
+    
+    protected double getFractionOfSentencesWith(String b) {
+	Optional<HistogramEntry<String>> entry = this.oncePerSentenceWordHist.get(b);
+	if(entry.isPresent()) {
+	    return (double)entry.get().count / (double) sentences.size();
+	} else {
+	    return 0.0;
 	}
     }
 }

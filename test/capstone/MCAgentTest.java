@@ -46,15 +46,29 @@ public class MCAgentTest {
 	String filename = "les_miserables.txt";
 	filename = "through_the_looking_glass.txt";
 	filename = "beowulf i to xxii.txt";
+	//TODO: use a small test file with known stats
 	try {
 	    //TODO:  Refactor Capstone to be able to make a word histogram from the sentences list, to cut down on how many times it has to read the file.
 	    Request request = new Request(filename).setRemoveStopWords(true);
 	    List<String> sentences = Capstone.readSentencesFromFile(filename);
 	    TreeHistogram<String> ngrams = NGrams.readNGramsFromFile(filename);
 	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, request);
-	    TreeHistogram<String> wordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(true));
-	    wordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
-	    instance = new MCAgent(wordHist, sentences, ngrams, matrix);
+	    WordMatrix binaryMatrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request(filename).setRemoveStopWords(true).setBinaryAssociationsOnly(true));
+	    
+	    TreeHistogram<String> totalAllWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(false));
+	    logger.info("\ntotalAllWordHist");
+	    totalAllWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    TreeHistogram<String> totalNonStopWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(true).setBinaryAssociationsOnly(true));
+	    logger.info("\ntotalNonStopWordHist");
+	    totalNonStopWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    TreeHistogram<String> oncePerSentenceWordHist = Capstone.fileSummaryTreeHistogram(request.setBinaryAssociationsOnly(true));
+	    logger.info("\noncePerSentence");
+	    oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    
+	    instance = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
+	    instance.setTotalNonStopWordHist(totalNonStopWordHist);
+	    instance.setOncePerSentenceWordHist(oncePerSentenceWordHist);
+	    instance.setBinaryMatrix(binaryMatrix);
 	} catch(IOException e) {
 	    System.err.println(e.getClass() + " " + e.getMessage());
 	}
@@ -82,15 +96,15 @@ public class MCAgentTest {
 	instance.getWordHist().insert(wordB, 1);
 	instance.getSentences().add(wordA + " " + wordB);
 	instance.getNgrams().insert(wordA + " " + wordB, 1);
-	instance.getMatrix().add(wordA, wordB);
+	instance.getWeightedMatrix().add(wordA, wordB);
 	instance.setBeta(0.0);*/
 	instance = this.insertAandBInSameSentence(instance, wordA, wordB, 1);
-	/*logger.debug(instance.getMatrix().get(wordA, wordB));
+	/*logger.debug(instance.getWeightedMatrix().get(wordA, wordB));
 	logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordA)).size());
 	logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordB)).size());
 	instance = this.insertAandBInSameSentence(instance, wordA, wordB, 2);*/
 	
-	int numAandB = instance.getMatrix().get(wordA, wordB);
+	int numAandB = instance.getWeightedMatrix().get(wordA, wordB);
 	int numSentences = instance.getSentences().size();
 	double prob = (double)numAandB / (numSentences * (1.0 + instance.getBeta()));
 	assertEquals(prob, instance.probAInSentenceWithB(wordA, wordB), EPSILON);
@@ -110,7 +124,7 @@ public class MCAgentTest {
 	String wordA = "wordA";
 	String wordB = "wordB";
 	instance = this.insertAandBInSameSentence(instance, wordA, wordB, 1);
-	int numWords = instance.getWordHist().getTotalCount();
+	int numWords = instance.getTotalAllWordHist().getTotalCount();
 	assertEquals(1.0 / (double)numWords, instance.getFractionOfWords(wordB), EPSILON);
 	assertEquals(1.0 / (double)numWords, instance.getFractionOfWords(wordA), EPSILON);
 	instance = this.insertAandBInSameSentence(instance, wordA, wordB, 2);
@@ -134,19 +148,19 @@ public class MCAgentTest {
     private MCAgent insertAandBInSameSentence(MCAgent instance, String wordA, String wordB, int n) {
 	
 	//It is possible they were already inserted, so check.
-	int numA = instance.getWordHist().queryFromFirst(w -> w.equals(wordA)).size();
-	int numB = instance.getWordHist().queryFromFirst(w -> w.equals(wordB)).size();
+	int numA = instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordA)).size();
+	int numB = instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordB)).size();
 	if(numA != 0) {
-	     numA = instance.getWordHist().queryAll(w -> w.equals(wordA)).get(0).count;
+	     numA = instance.getTotalAllWordHist().queryAll(w -> w.equals(wordA)).get(0).count;
 	}
 	if(numB != 0) {
-	    numB = instance.getWordHist().queryAll(w -> w.equals(wordB)).get(0).count;
+	    numB = instance.getTotalAllWordHist().queryAll(w -> w.equals(wordB)).get(0).count;
 	}
 	assertTrue(numA <= n);
 	assertTrue(numB <= n);
 	assertEquals(numA, numB);
 	
-	int numAandB = instance.getMatrix().get(wordA, wordB);
+	int numAandB = instance.getWeightedMatrix().get(wordA, wordB);
 	assertTrue(numAandB <= n);
 	if(numAandB > 0) {
 	    //They are already there.
@@ -170,29 +184,46 @@ public class MCAgentTest {
 	} else if(numAandB == 0) {
 	    assertEquals(0, numA + numB);
 	}*/
-	/*logger.debug(instance.getMatrix().get(wordA, wordB));
-	logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordA)).size());
-	logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordB)).size());*/
+	/*logger.debug(instance.getWeightedMatrix().get(wordA, wordB));
+	logger.debug(instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordA)).size());
+	logger.debug(instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordB)).size());*/
 	return instance;
     }
     
     private MCAgent addOnce(MCAgent instance, String wordA, String wordB) {
 	//logger.debug("addOnce");
-	//logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordA)).size());
-	//instance.getWordHist().queryFromFirst(w -> w.equals(wordB)).get(0);
-	//logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordB)));
-	/*logger.debug(instance.getWordHist().queryAll(w -> w.equals(wordA)));
-	logger.debug(instance.getWordHist().queryAll(w -> w.equals(wordB)));*/
-	instance.getWordHist().insert(wordA, 1);
-	instance.getWordHist().insert(wordB, 1);
-	//logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordA)).get(0));
-	//logger.debug(instance.getWordHist().queryFromFirst(w -> w.equals(wordB)).size());
-	/*logger.debug(instance.getWordHist().queryAll(w -> w.equals(wordA)));
-	logger.debug(instance.getWordHist().queryAll(w -> w.equals(wordB)));*/
+	//logger.debug(instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordA)).size());
+	//instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordB)).get(0);
+	//logger.debug(instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordB)));
+	/*logger.debug(instance.getTotalAllWordHist().queryAll(w -> w.equals(wordA)));
+	logger.debug(instance.getTotalAllWordHist().queryAll(w -> w.equals(wordB)));*/
+	instance.getTotalAllWordHist().insert(wordA, 1);
+	instance.getTotalAllWordHist().insert(wordB, 1);
+	instance.getOncePerSentenceWordHist().insert(wordA, 1);
+	instance.getOncePerSentenceWordHist().insert(wordB, 1);
+	//logger.debug(instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordA)).get(0));
+	//logger.debug(instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordB)).size());
+	/*logger.debug(instance.getTotalAllWordHist().queryAll(w -> w.equals(wordA)));
+	logger.debug(instance.getTotalAllWordHist().queryAll(w -> w.equals(wordB)));*/
 	instance.getSentences().add(wordA + " " + wordB);
 	instance.getNgrams().insert(wordA + " " + wordB, 1);
-	instance.getMatrix().add(wordA, wordB);
+	instance.getWeightedMatrix().add(wordA, wordB);
+	instance.getBinaryMatrix().add(wordA, wordB);
 	instance.setBeta(0.0);
 	return instance;
+    }
+    
+    @Test
+    public void testGetFractionOfSentencesWith() {
+	logger.info("\ntesting getFractionOfSentencesWith");
+	String wordA = "wordA";
+	String wordB = "wordB";
+	instance = this.insertAandBInSameSentence(instance, wordA, wordB, 1);
+	
+	logger.info(instance.getSentences().size());
+	logger.info(instance.getTotalAllWordHist().get(wordB).get());
+	logger.info(instance.getOncePerSentenceWordHist().get(wordB).get());
+	assertEquals(1.0 / 384, instance.getFractionOfSentencesWith(wordB), EPSILON);
+	//will need to change the above of course when the test file changes
     }
 }
