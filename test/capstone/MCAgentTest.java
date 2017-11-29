@@ -6,17 +6,20 @@
 
 package capstone;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import static java.util.stream.Collectors.toList;
+import org.apache.logging.log4j.*;
 import org.junit.After;
 import org.junit.AfterClass;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
-import org.apache.logging.log4j.*;
+import toolbox.stats.HistogramEntry;
 import toolbox.stats.TreeHistogram;
-
-import java.io.IOException;
 
 /**
  *
@@ -51,24 +54,36 @@ public class MCAgentTest {
 	    //TODO:  Refactor Capstone to be able to make a word histogram from the sentences list, to cut down on how many times it has to read the file.
 	    Request request = new Request(filename).setRemoveStopWords(true);
 	    List<String> sentences = Capstone.readSentencesFromFile(filename);
-	    TreeHistogram<String> ngrams = NGrams.readNGramsFromFile(filename);
+	    TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);	//TODO:  have the MCAgent compute this based on it's object variable, which should be specified in the genome
+	    String ngram = "while he";
+	    List<String> matchingNGrams = ngrams.queryFromFirst(word -> word.startsWith(ngram));
+	    List<HistogramEntry<String>> m = ngrams.queryAll(word -> word.startsWith(ngram));
+	    System.out.println(ngrams.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).collect(toList()));
+	    System.out.println("\n" + matchingNGrams);
+	    System.out.println("\n" + m);
+	    
 	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, request);
 	    WordMatrix binaryMatrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request(filename).setRemoveStopWords(true).setBinaryAssociationsOnly(true));
 	    
 	    TreeHistogram<String> totalAllWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(false));
-	    logger.info("\ntotalAllWordHist");
-	    totalAllWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    //logger.info("\ntotalAllWordHist");
+	    //totalAllWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
 	    TreeHistogram<String> totalNonStopWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(true).setBinaryAssociationsOnly(true));
-	    logger.info("\ntotalNonStopWordHist");
-	    totalNonStopWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    //logger.info("\ntotalNonStopWordHist");
+	    //totalNonStopWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
 	    TreeHistogram<String> oncePerSentenceWordHist = Capstone.fileSummaryTreeHistogram(request.setBinaryAssociationsOnly(true));
-	    logger.info("\noncePerSentence");
-	    oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    //logger.info("\noncePerSentence");
+	    //oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
 	    
 	    instance = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
 	    instance.setTotalNonStopWordHist(totalNonStopWordHist);
 	    instance.setOncePerSentenceWordHist(oncePerSentenceWordHist);
 	    instance.setBinaryMatrix(binaryMatrix);
+	    sentences.stream().forEach(s -> {
+		if(s.contains(" win ")) {
+		    System.out.println("\n-" + s);
+		}
+	    });
 	} catch(IOException e) {
 	    System.err.println(e.getClass() + " " + e.getMessage());
 	}
@@ -79,9 +94,47 @@ public class MCAgentTest {
     }
 
     @Test
+    public void testDoOneRunDemo() {
+	logger.info("testing doOneRunDemo");
+	instance.doOneRunDemo();
+    }
+    
+    
+    @Test
     public void testDoOneRun() {
-	logger.info("testing doOneRun");
-	instance.doOneRun();
+	logger.info("\ntesting doOneRun()");
+    }
+    
+    @Test
+    public void testMakeOnePrediction() {
+	logger.info("\ntesting makeOnePrediction()");
+    }
+    
+    @Test
+    public void testDoNGramPrediction() {
+	logger.info("\ntesting doNGramPrediction()");
+	String text = "I will win Hrothgar said to the";
+	text = "Healfdene the high, and long while he held it";
+	text = "Mickle wrack was it soothly for the friend of the Scyldings";
+	List<String> sentence = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));
+	String result = null;
+	result = instance.doNgramPrediction(sentence);
+	assertEquals("scyldings", result);
+    }
+    
+    @Test
+    public void testDoWordAssociationPrediction() {
+	logger.info("\ntesting doWordAssociationPrediction()");
+	List<String> sentence = Capstone.tokenize("I will win Hrothgar said to the", new Request(""));
+	//sentence.forEach(logger::debug);
+	assertEquals(3, sentence.size());
+	assertEquals("shall", instance.doWordAssociationPrediction(sentence));
+	
+	//logger.debug("\nMickle wrack was it soothly for the friend of the Scyldings");
+	String text = "Mickle wrack was it soothly for the friend of the";
+	sentence = Capstone.tokenize(text, new Request(""));
+	String prediction = instance.doWordAssociationPrediction(sentence);
+	logger.debug(prediction);
     }
     
     @Test
@@ -225,5 +278,43 @@ public class MCAgentTest {
 	logger.info(instance.getOncePerSentenceWordHist().get(wordB).get());
 	assertEquals(1.0 / 384, instance.getFractionOfSentencesWith(wordB), EPSILON);
 	//will need to change the above of course when the test file changes
+    }
+    
+    @Test
+    public void testGenerateGenome() {
+	logger.info("\ntesting generateGenome");
+	double[] genome = instance.generateRandomGenome();
+	assertEquals(instance.getGenomeLength(), genome.length);
+	logger.debug(toolbox.util.ListArrayUtil.arrayToString(genome));
+	logger.debug(toolbox.util.MathUtil.mean(genome));
+	assertEquals(2.5, toolbox.util.MathUtil.mean(genome), 1.0);
+    }
+    
+    @Test
+    public void testConstructNGram() {
+	logger.info("\ntesting constructNGram()");
+	List<String> sentence = null;
+	assertEquals("", instance.constructNgram(sentence, 3, 1));
+	
+	sentence = new ArrayList<>();
+	assertEquals("", instance.constructNgram(sentence, 3, 1));
+	
+	sentence = Arrays.asList("something", "of", "the", "subject", "we", "are", "talking", "about");
+	sentence = Capstone.tokenize("something of the subject we are talking about", new Request("").setRemoveStopWords(false));
+	logger.debug(sentence);
+	assertEquals("we are talking", instance.constructNgram(sentence, 3, 1));
+	assertEquals("subject we are", instance.constructNgram(sentence, 3, 2));
+	assertEquals("subject we are talking", instance.constructNgram(sentence, 4, 1));
+	assertEquals("are talking", instance.constructNgram(sentence, 2, 1));
+	assertEquals("we are talking about", instance.constructNgram(sentence, 4, 0));
+	
+	assertEquals("", instance.constructNgram(sentence, 3, 8));
+	//assertEquals("something", instance.constructNgram(sentence, 3, 7));
+	//TODO:  more rigor on when the numToLeaveOff is high; generally it will only be 1 so a low priority
+	
+	
+	sentence = Capstone.tokenize("I will win Hrothgar said to the", new Request("").setRemoveStopWords(false));
+	assertEquals("hrothgar said to", instance.constructNgram(sentence, 3));
+	logger.debug(sentence);
     }
 }

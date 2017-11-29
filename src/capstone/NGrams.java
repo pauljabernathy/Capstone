@@ -72,6 +72,16 @@ public class NGrams {
         return ngrams;
     }
     
+    public static TreeHistogram<String> getNGramsOfSentences(List<String> sentences, int n) {
+	TreeHistogram<String> ngrams = new TreeHistogram<>();
+	List<String> current = null;
+	for(String sentence : sentences) {
+	    current = extractNGrams(Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false)), n);
+	    current.stream().forEach(g -> ngrams.insert(g, 1));
+	}
+	return ngrams;
+    }
+    
     public static List<String> extractNGrams(List<String> words, int n) {
         List<String> grams = new ArrayList<>();
         for(int i = 0; i < words.size() - n + 1; i++) {

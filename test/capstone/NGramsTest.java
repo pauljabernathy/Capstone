@@ -202,6 +202,22 @@ public class NGramsTest {
     }
     
     @Test
+    public void testGetNGramsOfSentences() {
+	System.out.println("\ntesting getNGramsOfSentences");
+	String sentence1 = "one two three four five one two three";
+	String sentence2 = "a b c d";
+	String sentence3 = "one two three four five six seven eight a b";
+	List<String> sentences = new ArrayList<String>();
+	sentences.add(sentence1);
+	sentences.add(sentence2);
+	sentences.add(sentence3);
+	
+	TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);
+	List<HistogramEntry<String>> list = ngrams.getAsList(TreeHistogram.Sort.COUNT);
+	list.forEach(System.out::println);
+    }
+    
+    @Test
     public void testExtractNGrams() {
         System.out.println("\ntesting extractNGrams()");
         String filename = "scantest2.txt";

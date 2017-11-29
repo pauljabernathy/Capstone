@@ -25,6 +25,8 @@ public class Request {
     private boolean binaryAssociationsOnly;	//whether or not word assocations should keep track of the count, or just that one exists
     private boolean tokenizeOnSentenceBreaks;
     
+    //TODO: a variable for all lower case vs as is, or an enum for lower, upper, as is
+    
     public Request(String filename, List<String> wordBreaks, List<String> sentenceBreaks, StopWords stopWords, Map<String, String> replacements, boolean removeStopWords, boolean binaryAssociationsOnly) {
 	this.filename = filename;
 	this.wordBreaks = wordBreaks;
