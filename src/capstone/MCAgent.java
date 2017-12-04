@@ -53,6 +53,8 @@ public class MCAgent {
     private double[] genome;
     private int genomeLength = 8;
     
+    private static final String UNKNOWN = "UNKNOWN";
+    
     public MCAgent(List<String> sentences) {
 	this.sentences = sentences;
 	//sentences is actually the only true information.  The rest can be calculated from it and are only for speed.
@@ -238,9 +240,14 @@ public class MCAgent {
     public boolean doOneRun() {
 	
 	//Find a random sentence
+	String sentence = sentences.get(Random.uniformInts(1, 0, sentences.size() - 1)[0]);
+	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
+	String lastWord = words.get(words.size() - 1);
 	
 	//make a prediction on what the last word is
-	
+	this.doNgramPrediction(words);
+	this.doWordAssociationPrediction(words);
+
 	//return if it was correct or not
 	return false;
     }
@@ -298,16 +305,21 @@ public class MCAgent {
     }
     
     public String doWordAssociationPrediction(List<String> sentence) {
-	WeightedBinaryTree<String> scoresTree = this.getWordAssociationPrediction(sentence);
-	List<WeightedBinaryTree> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().limit(5).collect(toList());
+	/**WeightedBinaryTree<String> scoresTree = this.getWordAssociationScores(sentence);
+	List<WeightedBinaryTree> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().collect(toList());
+	System.out.println("\n\nscores:");
+	orderedScores.stream().limit(10).forEach(System.out::println);
 	if(orderedScores != null && orderedScores.size() > 1) {
 	    return orderedScores.get(1).getKey().toString();
 	} else {
 	    return "";
-	}
+	}/**/
+	/**/ProbDist<String> scores = this.getWordAssociationScores(sentence);
+	return scores.getValue(0);/**/
     }
     
-    public WeightedBinaryTree<String> getWordAssociationPrediction(List<String> sentence) {
+    public ProbDist<String> getWordAssociationScores(List<String> sentence) {
+    //public WeightedBinaryTree<String> getWordAssociationScores(List<String> sentence) {
 	sentence = sentence.stream().distinct().collect(toList());
 	//System.out.println(sentence);
 	//for each word in the sentence
@@ -317,14 +329,14 @@ public class MCAgent {
 	Map<String, ProbDist> dists = new HashMap<>();
 	Set<String> associatedWords = new HashSet<>();   //to keep track of words that are associated with any word in this sentence and could be candiates for the predicted word; will hold just a small portion of the total words
 	Map<String, Double> scores = new HashMap<>();
-	WeightedBinaryTree<String> scoresTree = new WeightedBinaryTree<String>("null", 1);
+	WeightedBinaryTree<String> scoresTree = new WeightedBinaryTree<>(UNKNOWN, 1);	//TODO: stop this as soon as the defect with the WBT constructor is fixed
 	for(String word : sentence) {
 	    //System.out.println("\n" + word);
 	    List<WordPairAssociation> associations = binaryMatrix.getAllAssociationsFor(word);
 	    //System.out.println(associations);
 	    for(WordPairAssociation wpa : associations) {
 		String other = wpa.getOther(word).get();
-		double prob = (double)wpa.getCount() / (double)this.getOncePerSentenceWordHist().get(word).get().count;
+		//double prob = (double)wpa.getCount() / (double)this.getOncePerSentenceWordHist().get(word).get().count;
 		double probWithBeta = this.probAInSentenceGivenB(wpa.getOther(word).get(), word);
 		//System.out.println("this.getOncePerSentenceWordHist().get(word) == " + this.getOncePerSentenceWordHist().get(word));
 		//System.out.println("(double)this.getOncePerSentenceWordHist().get(word).get().count == " + (double)this.getOncePerSentenceWordHist().get(word).get().count);
@@ -338,9 +350,29 @@ public class MCAgent {
 		} else {
 		    scores.put(other, probWithBeta);
 		}
-		scoresTree.insert(other, probWithBeta, DuplicateEntryOption.UPDATE);
+		//if(scoresTree == null) {
+		//    scoresTree = new WeightedBinaryTree(other, probWithBeta);
+		//} else {
+		    scoresTree.insert(other, probWithBeta, DuplicateEntryOption.UPDATE);
+		//}
 	    }
 	}
+	scoresTree.insert(UNKNOWN, .00000001, DuplicateEntryOption.REPLACE);	//hack to deal with the hack of initializing the WBT with a dummy root with weight 1
+	List<WeightedBinaryTree<String>> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().filter(t -> !t.getKey().equals(UNKNOWN)).collect(toList());
+	double totalWeight = scoresTree.getTreeWeight();
+	ProbDist<String> scoresProbs = new ProbDist<>();
+	//System.out.println("\n+++");
+	/**/orderedScores.stream().forEach(t -> {
+	    //System.out.println(t.getKey() + " " + t.getWeight());
+	    //if(!t.getKey().equals(UNKNOWN)) {
+		scoresProbs.add(t.getKey(), t.getWeight() / totalWeight);
+	    //} else {
+		//System.out.println("####was nullt");
+	    //}
+	});/**/
+	//System.out.println("\n---");
+	//System.out.println(scoresProbs);
+	
 	//instead of doing a regular Naive Bayes, doing something slightly different in coming up with a probability for each associated word for each
 	//word in the sentence, and then adding that to a WeightedBinaryTree.  Each time we encounter that associated word for another word in the
 	//sentence, we update the weight in the tree.  It creates a final score for each word.  Not exactly Naive Bayes I suppose, but effectively is
@@ -354,7 +386,8 @@ public class MCAgent {
 	//scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().limit(25).forEach(System.out::println);
 	//List<WeightedBinaryTree> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().limit(5).collect(toList());
 	//TODO: possibly randomly select from the distribution
-	return scoresTree;
+	//return scoresTree;
+	return scoresProbs;
     }
     
     public List<String> tokenizeSentence(String sentence) {
