@@ -7,12 +7,14 @@
 package capstone;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Predicate;
 import static java.util.stream.Collectors.toList;
 import toolbox.random.Random;
@@ -48,9 +50,17 @@ public class MCAgent {
     private WordMatrix weightedMatrix;
     private WordMatrix binaryMatrix;
     
+    private ProbDist<String> wordProbDist;
+    private ProbDist<String> ngramsProbDist;
+    
     private int ngramLength;
     
     private double[] genome;
+    private final int NGRAM_WEIGHT_POSITION = 0;
+    private final int WORD_ASSOCIATION_WEIGHT_POSITION = 1;
+    private final int RANDOM_WEIGHT_POSITION = 2;
+    private final int NGRAM_LENGTH_POSITION = 3;
+    
     private int genomeLength = 8;
     
     private static final String UNKNOWN = "UNKNOWN";
@@ -86,6 +96,9 @@ public class MCAgent {
 	this.ngrams = ngrams;
 	this.weightedMatrix = weightedMatrix;
 	this.binaryMatrix = binaryMatrix;
+	
+	this.wordProbDist = this.totalAllWordHist.computeProbDist();
+	this.ngramsProbDist = this.ngrams.computeProbDist();
 	
 	this.genome = this.generateRandomGenome();
 	this.beta = Constants.DEFAULT_BETA;
@@ -163,6 +176,22 @@ public class MCAgent {
 	this.binaryMatrix = binaryMatrix;
     }
 
+    public ProbDist<String> getWordProbDist() {
+	return wordProbDist;
+    }
+
+    public void setWordProbDist(ProbDist<String> wordProbDist) {
+	this.wordProbDist = wordProbDist;
+    }
+
+    public ProbDist<String> getNgramsProbDist() {
+	return ngramsProbDist;
+    }
+
+    public void setNgramsProbDist(ProbDist<String> ngramsProbDist) {
+	this.ngramsProbDist = ngramsProbDist;
+    }
+
     public double[] getGenome() {
 	return genome;
     }
@@ -181,7 +210,40 @@ public class MCAgent {
 	return this;
     }
     
+    public int getNgramLength() {
+	return ngramLength;
+    }
+
+    public void setNgramLength(int ngramLength) {
+	this.ngramLength = ngramLength;
+    }
     
+    protected double getNgramWeight() {
+	return this.genome[NGRAM_WEIGHT_POSITION];
+    }
+    
+    protected MCAgent setWordNGramWeight(double weight) {
+	this.genome[NGRAM_WEIGHT_POSITION] = weight;
+	return this;
+    }
+    
+    protected double getWordAssocationWeight() {
+	return this.genome[WORD_ASSOCIATION_WEIGHT_POSITION];
+    }
+    
+    protected MCAgent setWordAssoctionWeight(double weight) {
+	this.genome[WORD_ASSOCIATION_WEIGHT_POSITION] = weight;
+	return this;
+    }
+    
+    protected double getRandomWeight() {
+	return this.genome[RANDOM_WEIGHT_POSITION];
+    }
+    
+    protected MCAgent setRandomWeight(double weight) {
+	this.genome[RANDOM_WEIGHT_POSITION] = weight;
+	return this;
+    }
 
     /**
      * Does one run of the simulation
@@ -241,13 +303,10 @@ public class MCAgent {
 	
 	//Find a random sentence
 	String sentence = sentences.get(Random.uniformInts(1, 0, sentences.size() - 1)[0]);
-	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
-	String lastWord = words.get(words.size() - 1);
+	
 	
 	//make a prediction on what the last word is
-	this.doNgramPrediction(words);
-	this.doWordAssociationPrediction(words);
-
+	
 	//return if it was correct or not
 	return false;
     }
@@ -260,6 +319,8 @@ public class MCAgent {
 	List<String> allWords = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
 	List<String> goWords = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(true));
 	
+	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
+	//String lastWord = words.get(words.size() - 1);
 	
 	//From the words in it, try to predict the last word.
 	//=>
@@ -267,10 +328,15 @@ public class MCAgent {
 	//Get the ngram at the lastIndexToUse minus the last word (2, 3, 4 etc. specified by genome)
 	//based on that, find the most likely next work.
 
-	//
+	ProbDist<String> associations = this.getWordAssociationScores(words);
+	List<ProbDist<String>> dists = new ArrayList<>();
+	dists.add(this.ngramsProbDist);
+	dists.add(associations);
+	dists.add(this.wordProbDist);
+	ProbDist<String> totalProbDist = this.combineProbDists(dists);
+	System.out.println(totalProbDist);
 	
-	
-	return "";
+	return totalProbDist.getValue(0);
     }
     
     public String doNgramPrediction(List<String> sentence) {
@@ -283,7 +349,7 @@ public class MCAgent {
 	System.out.println(ngram);
 	Predicate<String> p = word -> word.startsWith(ngram);
 	//List<String> matchingNGrams = this.ngrams.queryFromFirst(p);	    //TODO:  find out why this gives an error (problem in TreeHistogram and/or WeightedBinaryTree)
-	List<HistogramEntry<String>> m = this.ngrams.queryAll(word -> word.startsWith(ngram)).stream().sorted((a, b) -> {
+	/*List<HistogramEntry<String>> m = this.ngrams.queryAll(p).stream().sorted((a, b) -> {
 	    if(a.count > b.count) {
 		return -1;
 	    } else if (a.count == b.count) {
@@ -291,35 +357,41 @@ public class MCAgent {
 	    } else {
 		return 1;
 	    }
-	}).collect(toList());
+	}).collect(toList());*/
 	
 	//System.out.println("\n" + matchingNGrams);
-	System.out.println("\nm = " + m);
-	Optional<HistogramEntry<String>> he = this.ngrams.findFirst(p);
+	//System.out.println("\nm = " + m);
+	Optional<HistogramEntry<String>> he = this.ngrams.findFirst(p);	    //faster than queryFromFirst, sort, and find the first element; O(logn) vs O(n) for queryAll and O(nlogn) for sort
+	//works because the ngrams is a TreeHistogram, with the items of higher count higher up in the tree
+	//If we were to change to a different histogram type or something else about the data structure or the way it is used were to change, this might now work.
+	//Actually, I just remembered, in the WeightedBinaryTree, it has the capability of not rebalancing until the child trees are of a certain % weight
+	//more than the parent tree.  Right now it always rebalances when the children are of higher weight, but if that changes then this also could cause
+	//the assumption in the above line of code to be violated.
 	if(he.isPresent()) {
-	    System.out.println("he = " + he.get());
+	    //System.out.println("he = " + he.get());
 	    return he.get().item.split(" ")[this.ngramLength];	    //TODO: proper computation of this; and coherent handling of ngram length
 	}
 	//return m.get(0).item.split(" ")[2];
 	return "";	    //TODO: random word from the all word histogram
     }
     
+    public ProbDist<String> getNGramProbDist(List<String> sentence) {
+	String ngram = this.constructNgram(sentence, 2);
+	System.out.println(ngram);
+	Predicate<String> p = word -> word.startsWith(ngram);
+	List<String> matchingNGrams = this.ngrams.queryFromFirst(p);	    //TODO:  find out why this gives an error (problem in TreeHistogram and/or WeightedBinaryTree)
+	
+	return null;
+    }
+    
     public String doWordAssociationPrediction(List<String> sentence) {
-	/**WeightedBinaryTree<String> scoresTree = this.getWordAssociationScores(sentence);
-	List<WeightedBinaryTree> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().collect(toList());
-	System.out.println("\n\nscores:");
-	orderedScores.stream().limit(10).forEach(System.out::println);
-	if(orderedScores != null && orderedScores.size() > 1) {
-	    return orderedScores.get(1).getKey().toString();
-	} else {
-	    return "";
-	}/**/
-	/**/ProbDist<String> scores = this.getWordAssociationScores(sentence);
+	ProbDist<String> scores = this.getWordAssociationScores(sentence);
+	//TODO:  possibly return a random value; whether or not we return the most likely value
+	//or a random value could be specified in the genome
 	return scores.getValue(0);/**/
     }
     
     public ProbDist<String> getWordAssociationScores(List<String> sentence) {
-    //public WeightedBinaryTree<String> getWordAssociationScores(List<String> sentence) {
 	sentence = sentence.stream().distinct().collect(toList());
 	//System.out.println(sentence);
 	//for each word in the sentence
@@ -338,55 +410,28 @@ public class MCAgent {
 		String other = wpa.getOther(word).get();
 		//double prob = (double)wpa.getCount() / (double)this.getOncePerSentenceWordHist().get(word).get().count;
 		double probWithBeta = this.probAInSentenceGivenB(wpa.getOther(word).get(), word);
-		//System.out.println("this.getOncePerSentenceWordHist().get(word) == " + this.getOncePerSentenceWordHist().get(word));
-		//System.out.println("(double)this.getOncePerSentenceWordHist().get(word).get().count == " + (double)this.getOncePerSentenceWordHist().get(word).get().count);
-		//System.out.println(wpa.getOther(word).get() + " " + prob + " " + this.probAInSentenceGivenB(wpa.getOther(word).get(), word));
-		//p.add(wpa.getOther(word).get(), prob);	//some clunky syntax
-		//P(A|B) = P(A & B) / P(B)    P(A & B) = #sentences with A and B / # sentences	    P(B) = #sentences with B / #sentences
-		//=> = #sentences with A and B / # sentences with B
 		associatedWords.add(wpa.getOther(word).get());
 		if(scores.containsKey(other)) {
 		    scores.put(other, scores.get(other) + probWithBeta);
 		} else {
 		    scores.put(other, probWithBeta);
 		}
-		//if(scoresTree == null) {
-		//    scoresTree = new WeightedBinaryTree(other, probWithBeta);
-		//} else {
-		    scoresTree.insert(other, probWithBeta, DuplicateEntryOption.UPDATE);
-		//}
+		scoresTree.insert(other, probWithBeta, DuplicateEntryOption.UPDATE);
 	    }
 	}
 	scoresTree.insert(UNKNOWN, .00000001, DuplicateEntryOption.REPLACE);	//hack to deal with the hack of initializing the WBT with a dummy root with weight 1
 	List<WeightedBinaryTree<String>> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().filter(t -> !t.getKey().equals(UNKNOWN)).collect(toList());
 	double totalWeight = scoresTree.getTreeWeight();
 	ProbDist<String> scoresProbs = new ProbDist<>();
-	//System.out.println("\n+++");
-	/**/orderedScores.stream().forEach(t -> {
-	    //System.out.println(t.getKey() + " " + t.getWeight());
-	    //if(!t.getKey().equals(UNKNOWN)) {
-		scoresProbs.add(t.getKey(), t.getWeight() / totalWeight);
-	    //} else {
-		//System.out.println("####was nullt");
-	    //}
+	orderedScores.stream().forEach(t -> {
+	    scoresProbs.add(t.getKey(), t.getWeight() / totalWeight);
 	});/**/
-	//System.out.println("\n---");
-	//System.out.println(scoresProbs);
+	
 	
 	//instead of doing a regular Naive Bayes, doing something slightly different in coming up with a probability for each associated word for each
 	//word in the sentence, and then adding that to a WeightedBinaryTree.  Each time we encounter that associated word for another word in the
 	//sentence, we update the weight in the tree.  It creates a final score for each word.  Not exactly Naive Bayes I suppose, but effectively is
 	//about the same, I think.
-	/*System.out.println("\nscores");
-	for(String other : scores.keySet()) {
-	    System.out.println(other + " " + scores.get(other) + " " + scoresTree.get(other).getWeight());
-	}*/
-	
-	//System.out.println("\nordered scores");
-	//scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().limit(25).forEach(System.out::println);
-	//List<WeightedBinaryTree> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().limit(5).collect(toList());
-	//TODO: possibly randomly select from the distribution
-	//return scoresTree;
 	return scoresProbs;
     }
     
@@ -479,5 +524,46 @@ public class MCAgent {
 	}
 	s.append(sentence.get(lastIndexToUse));
 	return s.toString();
+    }
+    
+    private ProbDist<String> combineProbDists(List<ProbDist<String>> dists) {
+	return this.combineProbDists(dists, new double[] { this.genome[this.NGRAM_WEIGHT_POSITION], this.genome[this.WORD_ASSOCIATION_WEIGHT_POSITION], this.genome[this.RANDOM_WEIGHT_POSITION] });
+    }
+    
+    protected ProbDist<String> combineProbDists(List<ProbDist<String>> dists, double[] weights) {
+	//skip check of sizes matching for now...
+	
+	ProbDist<String> result = new ProbDist<>();
+	double totalWeight = toolbox.util.MathUtil.sum(weights);
+	double weight = 0.0;
+	ProbDist<String> currentDist = null;
+	List<String> words = null;
+	List<Double> probs = null;
+	String word = null;
+	TreeMap<String, Double> resultMap = new TreeMap<>();
+	WeightedBinaryTree<String> t = new WeightedBinaryTree<>(UNKNOWN, 1);
+	for(int currentDistIndex = 0; currentDistIndex < dists.size(); currentDistIndex++) {
+	    currentDist = dists.get(currentDistIndex);
+	    weight = weights[currentDistIndex] / totalWeight;
+	    words = currentDist.getValues();
+	    probs = currentDist.getProbabilities();
+	    for(int currentProbIndex = 0; currentProbIndex < currentDist.getValues().size(); currentProbIndex++) {
+		word = words.get(currentProbIndex);
+		if(resultMap.keySet().contains(word)) {
+		    resultMap.put(word, resultMap.get(word) + probs.get(currentProbIndex) * weight);
+		} else {
+		    resultMap.put(word, probs.get(currentProbIndex) * weight);
+		}
+		t.insert(word, probs.get(currentProbIndex) * weight, DuplicateEntryOption.UPDATE);
+	    }
+	}
+	//resultMap.keySet().stream().forEach(k -> result.add(k, resultMap.get(k)));
+	t.insert(UNKNOWN, .00000001, DuplicateEntryOption.REPLACE);
+	t.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().forEach(node -> {
+	    if(!node.getKey().equals(UNKNOWN)) {
+		result.add(node.getKey(), node.getWeight());
+	    }
+	});
+	return result;
     }
 }

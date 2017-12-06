@@ -19,7 +19,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import toolbox.stats.HistogramEntry;
+import toolbox.stats.ProbDist;
 import toolbox.stats.TreeHistogram;
+import toolbox.util.ListArrayUtil;
 
 /**
  *
@@ -28,7 +30,13 @@ import toolbox.stats.TreeHistogram;
 public class MCAgentTest {
     
     private static Logger logger;
-    private MCAgent instance;
+    private static MCAgent instance;
+    
+    private static TreeHistogram<String> ngrams;
+    private static List<String> matchingNGrams;
+    private static List<HistogramEntry<String>> m;
+    private static WordMatrix matrix;
+    private static WordMatrix binaryMatrix;
     
     private double EPSILON = 0.0001;
     
@@ -38,6 +46,50 @@ public class MCAgentTest {
     @BeforeClass
     public static void setUpClass() {
 	logger = toolbox.util.ListArrayUtil.getLogger(MCAgentTest.class, Level.INFO);
+	
+	String filename = "les_miserables.txt";
+	filename = "through_the_looking_glass.txt";
+	filename = "beowulf i to xxii.txt";
+	//TODO: use a small test file with known stats
+	if(instance == null) {
+	    try {
+		//TODO:  Refactor Capstone to be able to make a word histogram from the sentences list, to cut down on how many times it has to read the file.
+		Request request = new Request(filename).setRemoveStopWords(true);
+		List<String> sentences = Capstone.readSentencesFromFile(filename);
+		TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);	//TODO:  have the MCAgent compute this based on it's object variable, which should be specified in the genome
+		String ngram = "while he";
+		List<String> matchingNGrams = ngrams.queryFromFirst(word -> word.startsWith(ngram));
+		List<HistogramEntry<String>> m = ngrams.queryAll(word -> word.startsWith(ngram));
+		System.out.println(ngrams.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).collect(toList()));
+		System.out.println("\n" + matchingNGrams);
+		System.out.println("\n" + m);
+
+		WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, request);
+		WordMatrix binaryMatrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request(filename).setRemoveStopWords(true).setBinaryAssociationsOnly(true));
+
+		TreeHistogram<String> totalAllWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(false));
+		//logger.info("\ntotalAllWordHist");
+		//totalAllWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+		TreeHistogram<String> totalNonStopWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(true).setBinaryAssociationsOnly(true));
+		//logger.info("\ntotalNonStopWordHist");
+		//totalNonStopWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+		TreeHistogram<String> oncePerSentenceWordHist = Capstone.fileSummaryTreeHistogram(request.setBinaryAssociationsOnly(true));
+		//logger.info("\noncePerSentence");
+		//oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+
+		instance = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
+		instance.setTotalNonStopWordHist(totalNonStopWordHist);
+		instance.setOncePerSentenceWordHist(oncePerSentenceWordHist);
+		instance.setBinaryMatrix(binaryMatrix);
+		sentences.stream().forEach(s -> {
+		    if(s.contains(" win ")) {
+			System.out.println("\n-" + s);
+		    }
+		});
+	    } catch(IOException e) {
+		System.err.println(e.getClass() + " " + e.getMessage());
+	    }
+	}
     }
     
     @AfterClass
@@ -46,54 +98,14 @@ public class MCAgentTest {
     
     @Before
     public void setUp() {
-	String filename = "les_miserables.txt";
-	filename = "through_the_looking_glass.txt";
-	filename = "beowulf i to xxii.txt";
-	//TODO: use a small test file with known stats
-	try {
-	    //TODO:  Refactor Capstone to be able to make a word histogram from the sentences list, to cut down on how many times it has to read the file.
-	    Request request = new Request(filename).setRemoveStopWords(true);
-	    List<String> sentences = Capstone.readSentencesFromFile(filename);
-	    TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);	//TODO:  have the MCAgent compute this based on it's object variable, which should be specified in the genome
-	    String ngram = "while he";
-	    List<String> matchingNGrams = ngrams.queryFromFirst(word -> word.startsWith(ngram));
-	    List<HistogramEntry<String>> m = ngrams.queryAll(word -> word.startsWith(ngram));
-	    System.out.println(ngrams.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).collect(toList()));
-	    System.out.println("\n" + matchingNGrams);
-	    System.out.println("\n" + m);
-	    
-	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, request);
-	    WordMatrix binaryMatrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request(filename).setRemoveStopWords(true).setBinaryAssociationsOnly(true));
-	    
-	    TreeHistogram<String> totalAllWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(false));
-	    //logger.info("\ntotalAllWordHist");
-	    //totalAllWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
-	    TreeHistogram<String> totalNonStopWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(true).setBinaryAssociationsOnly(true));
-	    //logger.info("\ntotalNonStopWordHist");
-	    //totalNonStopWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
-	    TreeHistogram<String> oncePerSentenceWordHist = Capstone.fileSummaryTreeHistogram(request.setBinaryAssociationsOnly(true));
-	    //logger.info("\noncePerSentence");
-	    //oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
-	    
-	    instance = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
-	    instance.setTotalNonStopWordHist(totalNonStopWordHist);
-	    instance.setOncePerSentenceWordHist(oncePerSentenceWordHist);
-	    instance.setBinaryMatrix(binaryMatrix);
-	    sentences.stream().forEach(s -> {
-		if(s.contains(" win ")) {
-		    System.out.println("\n-" + s);
-		}
-	    });
-	} catch(IOException e) {
-	    System.err.println(e.getClass() + " " + e.getMessage());
-	}
+	
     }
     
     @After
     public void tearDown() {
     }
 
-    @Test
+    //@Test
     public void testDoOneRunDemo() {
 	logger.info("testing doOneRunDemo");
 	instance.doOneRunDemo();
@@ -108,6 +120,11 @@ public class MCAgentTest {
     @Test
     public void testMakeOnePrediction() {
 	logger.info("\ntesting makeOnePrediction()");
+	String text = "Mickle wrack was it soothly for the friend of the";
+	//sentence = Capstone.tokenize(text, new Request(""));
+	System.out.println("\n\n" + ListArrayUtil.arrayToString(instance.getGenome()));
+	String result = instance.makeOnePrediction(text);
+	System.out.println(result);
     }
     
     @Test
@@ -128,7 +145,7 @@ public class MCAgentTest {
 	List<String> sentence = Capstone.tokenize("I will win Hrothgar said to the", new Request(""));
 	//sentence.forEach(logger::debug);
 	assertEquals(3, sentence.size());
-	assertEquals("shall", instance.doWordAssociationPrediction(sentence));
+	//assertEquals("shall", instance.doWordAssociationPrediction(sentence));
 	
 	//logger.debug("\nMickle wrack was it soothly for the friend of the Scyldings");
 	String text = "Mickle wrack was it soothly for the friend of the";
@@ -199,16 +216,20 @@ public class MCAgentTest {
      * @return 
      */
     private MCAgent insertAandBInSameSentence(MCAgent instance, String wordA, String wordB, int n) {
-	
+	logger.debug("insertAandBInSameSentence(" + wordA + ", " + wordB + ", " + n + ")");
 	//It is possible they were already inserted, so check.
 	int numA = instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordA)).size();
+	logger.debug("numA == " + numA);
 	int numB = instance.getTotalAllWordHist().queryFromFirst(w -> w.equals(wordB)).size();
+	logger.debug("numB == " + numB);
 	if(numA != 0) {
 	     numA = instance.getTotalAllWordHist().queryAll(w -> w.equals(wordA)).get(0).count;
 	}
 	if(numB != 0) {
 	    numB = instance.getTotalAllWordHist().queryAll(w -> w.equals(wordB)).get(0).count;
 	}
+	logger.debug("numA == " + numA);
+	logger.debug("numB == " + numB);
 	assertTrue(numA <= n);
 	assertTrue(numB <= n);
 	assertEquals(numA, numB);
@@ -316,5 +337,69 @@ public class MCAgentTest {
 	sentence = Capstone.tokenize("I will win Hrothgar said to the", new Request("").setRemoveStopWords(false));
 	assertEquals("hrothgar said to", instance.constructNgram(sentence, 3));
 	logger.debug(sentence);
+    }
+    
+    @Test
+    public void testCombineProbDists() {
+	logger.info("\ntesting combineProbDists()");
+	ProbDist<String> p1 = new ProbDist<String>();
+	p1.add("a", .1);
+	p1.add("b", .2);
+	p1.add("c", .3);
+	p1.add("d", .4);
+	
+	ProbDist<String> p2 = new ProbDist<String>();
+	p2.add("a", .25);
+	p2.add("b", .25);
+	p2.add("c", .25);
+	p2.add("d", .25);
+	
+	ProbDist<String> p3 = new ProbDist<String>();
+	p3.add("b", .25);
+	p3.add("c", .25);
+	p3.add("d", .25);
+	p3.add("e", .25);
+	
+	List<ProbDist<String>> dists = new ArrayList<>();
+	dists.add(p1);
+	dists.add(p2);
+	dists.add(p3);
+	ProbDist<String> result = null;
+	
+	result = instance.combineProbDists(dists, new double[] { 1.0, 0.0, 0.0 });
+	logger.debug(result);
+	assertEquals(1.0, toolbox.util.MathUtil.sum(result.getProbabilities()), EPSILON);
+	assertEquals(.1, result.probatilityOf("a"), EPSILON);
+	assertEquals(.2, result.probatilityOf("b"), EPSILON);
+	assertEquals(.3, result.probatilityOf("c"), EPSILON);
+	assertEquals(.4, result.probatilityOf("d"), EPSILON);
+	assertEquals(0.0, result.probatilityOf("e"), EPSILON);
+	
+	result = instance.combineProbDists(dists, new double[] { 0.0, 1.0, 0.0 });
+	logger.debug(result);
+	assertEquals(1.0, toolbox.util.MathUtil.sum(result.getProbabilities()), EPSILON);
+	assertEquals(.25, result.probatilityOf("a"), EPSILON);
+	assertEquals(.25, result.probatilityOf("b"), EPSILON);
+	assertEquals(.25, result.probatilityOf("c"), EPSILON);
+	assertEquals(.25, result.probatilityOf("d"), EPSILON);
+	assertEquals(0.0, result.probatilityOf("e"), EPSILON);
+	
+	result = instance.combineProbDists(dists, new double[] { 0.0, 0.0, 1.0 });
+	logger.debug(result);
+	assertEquals(1.0, toolbox.util.MathUtil.sum(result.getProbabilities()), EPSILON);
+	assertEquals(0, result.probatilityOf("a"), EPSILON);
+	assertEquals(.25, result.probatilityOf("b"), EPSILON);
+	assertEquals(.25, result.probatilityOf("c"), EPSILON);
+	assertEquals(.25, result.probatilityOf("d"), EPSILON);
+	assertEquals(.25, result.probatilityOf("e"), EPSILON);
+	
+	result = instance.combineProbDists(dists, new double[] { 1.0, 1.0, 1.0 });
+	logger.debug(result);
+	assertEquals(1.0, toolbox.util.MathUtil.sum(result.getProbabilities()), EPSILON);
+	assertEquals(.11666667, result.probatilityOf("a"), EPSILON);
+	assertEquals(.2333333, result.probatilityOf("b"), EPSILON);
+	assertEquals(.2666667, result.probatilityOf("c"), EPSILON);
+	assertEquals(.3, result.probatilityOf("d"), EPSILON);
+	assertEquals(.0833333, result.probatilityOf("e"), EPSILON);
     }
 }
