@@ -21,6 +21,7 @@ import toolbox.random.Random;
 import toolbox.stats.*;
 import toolbox.trees.DuplicateEntryOption;
 import toolbox.trees.WeightedBinaryTree;
+import toolbox.util.ListArrayUtil;
 
 /*parameters to be tuned:
 -weight of prediction methods (ngrams, word associations, random selection, other algorithms) relative to each other
@@ -54,6 +55,8 @@ public class MCAgent {
     private ProbDist<String> ngramsProbDist;
     
     private int ngramLength;
+    private int numRunsPerBatch;
+    private int numBatches;
     
     private double[] genome;
     private final int NGRAM_WEIGHT_POSITION = 0;
@@ -103,6 +106,8 @@ public class MCAgent {
 	this.genome = this.generateRandomGenome();
 	this.beta = Constants.DEFAULT_BETA;
 	this.ngramLength = 2;
+	this.numRunsPerBatch = 20;
+	this.numBatches = 40;
     }
 
     public double getBeta() {
@@ -292,23 +297,69 @@ public class MCAgent {
 	}
     }
     
-    
-    public void doOneBatch() {
-	//make a series of runs (doOneRunDemo() may not be exactly the right function but it is the same idea), making a prediction each time
+    public static void main(String[] args) {
 	
-	//count the number correct predictions
     }
     
+    public void run() {
+	int currentNumCorrect = 0;
+	int bestNumCorrect = 0;
+	double[] bestGenome = this.genome.clone();
+	
+	for(int i = 0; i < numBatches; i++) {
+	    currentNumCorrect = this.doOneBatch();
+	    System.out.println("currentNumCorrect = " + currentNumCorrect);
+	    if(currentNumCorrect > bestNumCorrect) {
+		System.out.println(ListArrayUtil.arrayToString(bestGenome) + " was better than " + ListArrayUtil.arrayToString(this.genome));
+		bestNumCorrect = currentNumCorrect;
+		bestGenome = this.genome;
+	    }
+	    System.out.flush();
+	    this.mutateGenome();
+	}
+	this.genome = bestGenome;
+	System.out.println("final genome is " + ListArrayUtil.arrayToString(this.genome));
+    }
+    
+    public int doOneBatch() {
+	//make a series of runs making a prediction each time
+	//count the number correct predictions
+	numRunsPerBatch = 100;
+	int numCorrect = 0;
+	for(int i = 0; i < numRunsPerBatch; i++) {
+	    if(this.doOneRun()) {
+		//System.out.println("was correct");
+		numCorrect++;
+	    }
+	}
+	return numCorrect;
+    }
+    
+    //TODO:  possible return some result object that contains the true/false value and an error message
     public boolean doOneRun() {
 	
 	//Find a random sentence
 	String sentence = sentences.get(Random.uniformInts(1, 0, sentences.size() - 1)[0]);
-	
+	if(sentence == null) {
+	    System.err.println("randomly chosen sentence was null; returning false");
+	    return false;
+	}
+	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
+	String lastWord = words.get(words.size() - 1);
+	if(lastWord == null) {
+	    System.err.println("lastWord was null:  " + sentence + "; return ing false");
+	    return false;
+	}
 	
 	//make a prediction on what the last word is
+	String prediction = this.makeOnePrediction(words);
 	
 	//return if it was correct or not
-	return false;
+	if(prediction == null) {
+	    System.err.println("prediction was null, returning false");
+	    return false;
+	}
+	return prediction.equals(lastWord);
     }
     
     public String makeOnePrediction(String sentence) {
@@ -316,72 +367,53 @@ public class MCAgent {
 	//Token the sentence.  Should we remove the stop words here?  Should that be part of the genome?
 	//I think the stop words stay because they are used in the ngrams.  But they are not used in the associations.
 	//Maybe tokenize twice - once for the ngrams and another for the associations.
-	List<String> allWords = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
-	List<String> goWords = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(true));
 	
 	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
 	//String lastWord = words.get(words.size() - 1);
-	
-	//From the words in it, try to predict the last word.
+	return this.makeOnePrediction(words);
+    }
+    
+    public String makeOnePrediction(List<String> sentence) {
+	//System.out.println("makeOnePrediction(" + sentence + ")");
+	//From the sentence in it, try to predict the last word.
 	//=>
 	//ngram prediction
 	//Get the ngram at the lastIndexToUse minus the last word (2, 3, 4 etc. specified by genome)
 	//based on that, find the most likely next work.
 
-	ProbDist<String> associations = this.getWordAssociationScores(words);
+	ProbDist<String> associations = this.getWordAssociationScores(sentence);
 	List<ProbDist<String>> dists = new ArrayList<>();
-	dists.add(this.ngramsProbDist);
+	dists.add(this.getNgramPredictionProbDist(sentence));
 	dists.add(associations);
 	dists.add(this.wordProbDist);
 	ProbDist<String> totalProbDist = this.combineProbDists(dists);
-	System.out.println(totalProbDist);
+	//System.out.println(totalProbDist);
 	
-	return totalProbDist.getValue(0);
+	return totalProbDist.getValue(0);   //TODO:  some sort of error checking
     }
     
-    public String doNgramPrediction(List<String> sentence) {
+    public ProbDist<String> getNgramPredictionProbDist(List<String> sentence) {
 	//look at the histogram of ngrams to see which ones firstIndexToUse with the given ngram
 	//find the most common one and return it
 	//TODO:  an element of randomness?  maybe choose a random one, with the probability being equal to its proportion in the histogram?
 	//maybe specify the randomness in the genome?
 	
 	String ngram = this.constructNgram(sentence, 2);
-	System.out.println(ngram);
+	//System.out.println(ngram);
 	Predicate<String> p = word -> word.startsWith(ngram);
-	//List<String> matchingNGrams = this.ngrams.queryFromFirst(p);	    //TODO:  find out why this gives an error (problem in TreeHistogram and/or WeightedBinaryTree)
-	/*List<HistogramEntry<String>> m = this.ngrams.queryAll(p).stream().sorted((a, b) -> {
-	    if(a.count > b.count) {
-		return -1;
-	    } else if (a.count == b.count) {
-		return 0;
-	    } else {
-		return 1;
-	    }
-	}).collect(toList());*/
-	
-	//System.out.println("\n" + matchingNGrams);
-	//System.out.println("\nm = " + m);
-	Optional<HistogramEntry<String>> he = this.ngrams.findFirst(p);	    //faster than queryFromFirst, sort, and find the first element; O(logn) vs O(n) for queryAll and O(nlogn) for sort
-	//works because the ngrams is a TreeHistogram, with the items of higher count higher up in the tree
-	//If we were to change to a different histogram type or something else about the data structure or the way it is used were to change, this might now work.
-	//Actually, I just remembered, in the WeightedBinaryTree, it has the capability of not rebalancing until the child trees are of a certain % weight
-	//more than the parent tree.  Right now it always rebalances when the children are of higher weight, but if that changes then this also could cause
-	//the assumption in the above line of code to be violated.
-	if(he.isPresent()) {
-	    //System.out.println("he = " + he.get());
-	    return he.get().item.split(" ")[this.ngramLength];	    //TODO: proper computation of this; and coherent handling of ngram length
-	}
-	//return m.get(0).item.split(" ")[2];
-	return "";	    //TODO: random word from the all word histogram
+	ProbDist<String> probsGiven = this.ngramsProbDist.given(p);
+	probsGiven.setValues(probsGiven.getValues().stream().map(word -> word.replaceAll(ngram, "").trim()).collect(toList()));
+	return probsGiven;
     }
     
-    public ProbDist<String> getNGramProbDist(List<String> sentence) {
-	String ngram = this.constructNgram(sentence, 2);
+    public ProbDist<String> getNGramProbDist() {
+	/*String ngram = this.constructNgram(sentence, 2);
 	System.out.println(ngram);
 	Predicate<String> p = word -> word.startsWith(ngram);
 	List<String> matchingNGrams = this.ngrams.queryFromFirst(p);	    //TODO:  find out why this gives an error (problem in TreeHistogram and/or WeightedBinaryTree)
 	
-	return null;
+	return null;*/
+	return this.ngramsProbDist;
     }
     
     public String doWordAssociationPrediction(List<String> sentence) {
@@ -501,9 +533,20 @@ public class MCAgent {
 	return Random.getUniformDoubles(genomeLength, 0.0, 5.0);
     }
     
-    protected double[] mutateGenome(double[] current) {
-	//TODO:  fill in
-	return current;
+    protected double[] mutateGenome() {
+	//TODO:  fill in; use SecureRandom
+	double rand = Math.random();
+	int index = 0;
+	if(rand < .1) {
+	    this.genome = this.generateRandomGenome();
+	} else {
+	    rand = Math.random();
+	    index = (int)(rand * (double)this.genome.length);
+	    double newValue = Random.getUniformDoubles(1, 0.0, 5.0)[0];
+	    this.genome[index] = newValue;
+	    System.out.println(index + " " + newValue);
+	}
+	return this.genome;
     }
     
     protected String constructNgram(List<String> sentence, int length) {
@@ -519,6 +562,9 @@ public class MCAgent {
 	StringBuilder s = new StringBuilder();
 	int lastIndexToUse = (sentence.size() - 1) - numToLeaveOff;
 	int firstIndexToUse = lastIndexToUse - (length - 1);
+	if(firstIndexToUse < 0) {
+	    return result;
+	}
 	for(int i = firstIndexToUse; i < lastIndexToUse; i++) {
 	    s.append(sentence.get(i)).append(Constants.SPACE);
 	}
@@ -549,6 +595,9 @@ public class MCAgent {
 	    probs = currentDist.getProbabilities();
 	    for(int currentProbIndex = 0; currentProbIndex < currentDist.getValues().size(); currentProbIndex++) {
 		word = words.get(currentProbIndex);
+		if(word == null) {
+		    continue;
+		}
 		if(resultMap.keySet().contains(word)) {
 		    resultMap.put(word, resultMap.get(word) + probs.get(currentProbIndex) * weight);
 		} else {

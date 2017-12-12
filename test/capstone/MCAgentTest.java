@@ -18,10 +18,12 @@ import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import toolbox.random.Random;
 import toolbox.stats.HistogramEntry;
 import toolbox.stats.ProbDist;
 import toolbox.stats.TreeHistogram;
 import toolbox.util.ListArrayUtil;
+import toolbox.util.MathUtil;
 
 /**
  *
@@ -86,6 +88,8 @@ public class MCAgentTest {
 			System.out.println("\n-" + s);
 		    }
 		});
+		
+		//logger.debug(instance.getNGramProbDist());
 	    } catch(IOException e) {
 		System.err.println(e.getClass() + " " + e.getMessage());
 	    }
@@ -111,20 +115,64 @@ public class MCAgentTest {
 	instance.doOneRunDemo();
     }
     
+    @Test
+    public void testRun() {
+	logger.info("running run()");
+	instance.run();
+    }
     
     @Test
     public void testDoOneRun() {
 	logger.info("\ntesting doOneRun()");
+	int numCorrect = 0;
+	for(int i = 0; i < 50; i++) {
+	    if(instance.doOneRun()) {
+		System.out.println("was correct");
+		numCorrect++;
+	    }
+	}
+	logger.info(numCorrect);
     }
     
     @Test
     public void testMakeOnePrediction() {
 	logger.info("\ntesting makeOnePrediction()");
-	String text = "Mickle wrack was it soothly for the friend of the";
+	String text = "Mickle wrack was it soothly for the friend of the Scyldings";
 	//sentence = Capstone.tokenize(text, new Request(""));
-	System.out.println("\n\n" + ListArrayUtil.arrayToString(instance.getGenome()));
+	logger.debug("\n\n" + ListArrayUtil.arrayToString(instance.getGenome()));
+	
 	String result = instance.makeOnePrediction(text);
-	System.out.println(result);
+	logger.debug(result);
+	
+	//logger.debug("\n" + this.makeOnePredictionOneSentence(text));
+	
+	try {
+	    //logger.debug(Random.sample(instance.getSentences(), 1, true).getClass());
+	    List<String> sampleSentences = Random.sample(instance.getSentences(), 1, true);
+	    sampleSentences.stream().forEach(s -> logger.debug(this.makeOnePredictionOneSentence(s)));
+	} catch(Exception e) {
+	    
+	}
+    }
+    
+    private int makeOnePredictionOneSentence(String sentence) {
+	logger.debug(sentence);
+	int numCorrect = 0;
+	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
+	String lastWord = words.get(words.size() - 1);
+	logger.debug("word to predict is " + lastWord + "\n");
+	String current = null;
+	for(int i = 0; i < 50; i++) {
+	    current = instance.makeOnePrediction(sentence);
+	    //logger.debug(current + " " + ListArrayUtil.arrayToString(instance.getGenome()));
+	    //numCorrect = lastWord.equals(current) ? numCorrect++ : numCorrect;
+	    if(lastWord.equals(current)) {
+		numCorrect++;
+	    }
+	    instance.mutateGenome();
+	    //instance.getGenome()[2] = 0.0;
+	}
+	return numCorrect;
     }
     
     @Test
@@ -134,9 +182,12 @@ public class MCAgentTest {
 	text = "Healfdene the high, and long while he held it";
 	text = "Mickle wrack was it soothly for the friend of the Scyldings";
 	List<String> sentence = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));
-	String result = null;
-	result = instance.doNgramPrediction(sentence);
-	assertEquals("scyldings", result);
+	ProbDist<String> result = null;
+	result = instance.getNgramPredictionProbDist(sentence);
+	logger.debug(result);
+	assertEquals("scyldings", result.getValue(0));
+	
+	//logger.debug(instance.getNGramProbDist().given(ngram -> ngram.startsWith("of the")));
     }
     
     @Test
@@ -152,6 +203,14 @@ public class MCAgentTest {
 	sentence = Capstone.tokenize(text, new Request(""));
 	String prediction = instance.doWordAssociationPrediction(sentence);
 	logger.debug(prediction);
+    }
+    
+    @Test
+    public void testGetWordAssociationScores() {
+	logger.info("\ntesting getWordAssociationScores()");
+	String text = "Mickle wrack was it soothly for the friend of the Scyldings";
+	List<String> sentence = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));
+	logger.debug(instance.getWordAssociationScores(sentence));
     }
     
     @Test
@@ -299,6 +358,33 @@ public class MCAgentTest {
 	logger.info(instance.getOncePerSentenceWordHist().get(wordB).get());
 	assertEquals(1.0 / 384, instance.getFractionOfSentencesWith(wordB), EPSILON);
 	//will need to change the above of course when the test file changes
+    }
+    
+    @Test
+    public void testMutateGenome() {
+	logger.info("\ntesting mutateGenome()");
+	/*double rand = Math.random();
+	int index = 0;
+	logger.debug(rand);
+	for(int i = 0; i < 50; i++) {
+	    rand = Math.random();
+	    if(rand < .1) {
+		logger.debug(ListArrayUtil.arrayToString(instance.generateRandomGenome()));
+	    } else {
+		rand = Math.random();
+		logger.debug(rand);
+		index = (int)(rand * (double)instance.getGenome().length);
+		logger.debug(index);
+	    }
+	}*/
+	double[] genome = instance.getGenome().clone();
+	//logger.debug(ListArrayUtil.arrayToString(genome));
+	double[] result = instance.mutateGenome();
+	//logger.debug(ListArrayUtil.arrayToString(genome));
+	//logger.debug(ListArrayUtil.arrayToString(result));
+	//logger.debug(ListArrayUtil.findNumDiffs(genome, result));
+	int numDiffs = ListArrayUtil.findNumDiffs(genome, result);
+	assertTrue(numDiffs == 1 || numDiffs == 8);
     }
     
     @Test
