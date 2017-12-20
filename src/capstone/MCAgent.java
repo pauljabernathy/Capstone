@@ -36,7 +36,7 @@ import toolbox.util.ListArrayUtil;
  *
  * @author paul
  */
-public class MCAgent {
+public class MCAgent implements Runnable {
     
     //TODO: inject a genome to code for parameters
     private double beta;    //deals with prior probability of one word given another; parameter specifies how many times we are pretending we found the same word histogram before but with no words together in a sentence
@@ -66,6 +66,9 @@ public class MCAgent {
     
     private int genomeLength = 8;
     
+    private String name;
+    private double latestRatioCorrect;
+    
     private static final String UNKNOWN = "UNKNOWN";
     
     public MCAgent(List<String> sentences) {
@@ -74,8 +77,12 @@ public class MCAgent {
 	//The other objects should be passed in because the MCAgentRunner can calculate it all one for all of the agents.
 	//If this constructor is used, the calling code will either need to use the setters or this class will need to call the appropriate methods in Capstone.
 	
+	this.genome = this.generateRandomGenome();
 	this.beta = Constants.DEFAULT_BETA;
-	this.ngramLength = 3;
+	this.ngramLength = 2;
+	this.numRunsPerBatch = 100;
+	this.numBatches = 40;
+	this.name = UNKNOWN;
     }
     
     //TODO: remove - use either the default (with just senteces) or the full
@@ -92,6 +99,7 @@ public class MCAgent {
     
     public MCAgent(List<String> sentences, TreeHistogram<String> totalAllWordHist, TreeHistogram<String> totalNonStopWordHist, TreeHistogram<String> oncePerSentenceWordHist, 
 	TreeHistogram<String> ngrams, WordMatrix weightedMatrix, WordMatrix binaryMatrix) {
+	this(sentences);
 	this.sentences = sentences;
 	this.totalAllWordHist = totalAllWordHist;
 	this.totalNonStopWordHist = totalNonStopWordHist;
@@ -99,15 +107,6 @@ public class MCAgent {
 	this.ngrams = ngrams;
 	this.weightedMatrix = weightedMatrix;
 	this.binaryMatrix = binaryMatrix;
-	
-	this.wordProbDist = this.totalAllWordHist.computeProbDist();
-	this.ngramsProbDist = this.ngrams.computeProbDist();
-	
-	this.genome = this.generateRandomGenome();
-	this.beta = Constants.DEFAULT_BETA;
-	this.ngramLength = 2;
-	this.numRunsPerBatch = 20;
-	this.numBatches = 40;
     }
 
     public double getBeta() {
@@ -177,24 +176,27 @@ public class MCAgent {
 	return binaryMatrix;
     }
 
-    public void setBinaryMatrix(WordMatrix binaryMatrix) {
+    public MCAgent setBinaryMatrix(WordMatrix binaryMatrix) {
 	this.binaryMatrix = binaryMatrix;
+	return this;
     }
 
     public ProbDist<String> getWordProbDist() {
 	return wordProbDist;
     }
 
-    public void setWordProbDist(ProbDist<String> wordProbDist) {
+    public MCAgent setWordProbDist(ProbDist<String> wordProbDist) {
 	this.wordProbDist = wordProbDist;
+	return this;
     }
 
     public ProbDist<String> getNgramsProbDist() {
 	return ngramsProbDist;
     }
 
-    public void setNgramsProbDist(ProbDist<String> ngramsProbDist) {
+    public MCAgent setNgramsProbDist(ProbDist<String> ngramsProbDist) {
 	this.ngramsProbDist = ngramsProbDist;
+	return this;
     }
 
     public double[] getGenome() {
@@ -219,8 +221,27 @@ public class MCAgent {
 	return ngramLength;
     }
 
-    public void setNgramLength(int ngramLength) {
+    public MCAgent setNgramLength(int ngramLength) {
 	this.ngramLength = ngramLength;
+	return this;
+    }
+    
+    public int getNumRunsPerBatch() {
+	return this.numRunsPerBatch;
+    }
+    
+    public MCAgent setNumRunsPerBatch(int numRuns) {
+	this.numRunsPerBatch = numRuns;
+	return this;
+    }
+    
+    public int getNumBatches() {
+	return this.numBatches;
+    }
+    
+    public MCAgent setNumBatches(int numBatches) {
+	this.numBatches = numBatches;
+	return this;
     }
     
     protected double getNgramWeight() {
@@ -249,52 +270,18 @@ public class MCAgent {
 	this.genome[RANDOM_WEIGHT_POSITION] = weight;
 	return this;
     }
+    
+    public String getName() {
+	return this.name;
+    }
+    
+    public MCAgent setName(String name) {
+	this.name = name;
+	return this;
+    }
 
-    /**
-     * Does one run of the simulation
-     */
-    protected void doOneRunDemo() {
-	try {
-	    List<String> sampleSentences = toolbox.random.Random.sample(sentences, 2, true);
-	    sampleSentences.forEach(System.out::println);
-	    
-	    for(String sentence : sampleSentences) {
-		System.out.println();
-		String[] words = sentence.split(" ");
-		if(words.length < 4) {
-		    continue;
-		}
-		int n = words.length;
-		String threeGram = words[n - 4] + " " + words[n - 3] + " " + words[n - 2];
-		//System.out.println(threeGram);
-		String twoGram = words[n - 3] + " " + words[n - 2];
-		System.out.println(twoGram);
-		String toPredict = words[n - 1];
-		List<HistogramEntry<String>> matches = ngrams.queryAll(ng -> ng.startsWith(twoGram));
-		matches.forEach(m -> System.out.println("\t" + m));
-		
-		//tokenizing this separately because here we want to remove stop words and we do not want to on the ngrams
-		List<String> tokens = Capstone.tokenize(sentence, new Request(null).setRemoveStopWords(true));
-		WordMatrix sentenceWordMatrix = Capstone.findWordMatrix(tokens.toArray(new String[] {}));
-		for(String token: tokens) {
-		    System.out.println(token + " " + this.getFractionOfWords(token));
-		    //System.out.println(sentenceWordMatrix.getAllAssociationsFor(token));
-		    List<WordPairAssociation> associations = weightedMatrix.getAllAssociationsFor(token);
-		    System.out.println(weightedMatrix.getAllAssociationsFor(token));
-		    
-		    //Find the words with the highest probability to appear in the same sentence as word "token."
-		    for(WordPairAssociation wpa : associations) {
-			String other = wpa.getOther(token).get();
-			System.out.println(other + " " + wpa.getCount() + " " + this.probAInSentenceWithB(other, token) + " " + this.probAInSentenceWithB(token, other));
-			System.out.println(this.probAInSentenceGivenB(other, token));
-		    }
-		}
-	    }
-	} catch(IOException e) {
-	    System.err.println(e.getClass() + " trying to get the WordMatrix:  " + e.getMessage());
-	} catch(Exception e) {
-	    System.err.println(e.getClass() + " trying to get the WordMatrix:  " + e.getMessage());
-	}
+    public double getLatestRatioCorrect() {
+	return this.latestRatioCorrect;
     }
     
     public static void main(String[] args) {
@@ -307,24 +294,60 @@ public class MCAgent {
 	double[] bestGenome = this.genome.clone();
 	
 	for(int i = 0; i < numBatches; i++) {
+	    //System.out.println("genome is " + ListArrayUtil.arrayToString(this.genome));
 	    currentNumCorrect = this.doOneBatch();
-	    System.out.println("currentNumCorrect = " + currentNumCorrect);
+	    //System.out.println("currentNumCorrect = " + currentNumCorrect);
 	    if(currentNumCorrect > bestNumCorrect) {
-		System.out.println(ListArrayUtil.arrayToString(bestGenome) + " was better than " + ListArrayUtil.arrayToString(this.genome));
+		//System.out.println(ListArrayUtil.arrayToString(this.genome) + " was better than " + ListArrayUtil.arrayToString(bestGenome));
 		bestNumCorrect = currentNumCorrect;
-		bestGenome = this.genome;
+		bestGenome = this.genome.clone();
+	    } else {
+		this.genome = bestGenome.clone();
 	    }
 	    System.out.flush();
 	    this.mutateGenome();
 	}
 	this.genome = bestGenome;
-	System.out.println("final genome is " + ListArrayUtil.arrayToString(this.genome));
+	this.latestRatioCorrect = (double)bestNumCorrect / (double)this.numRunsPerBatch;
+	System.out.println(this.name + ":  final genome is " + ListArrayUtil.arrayToString(this.genome) + " with " + this.latestRatioCorrect * 100.0 + "% correct");
+	
+	//System.out.println("now try a few predictions");
+	//this.doPredictions(100);
+    }
+    
+    /**
+     * To actually do a specified number of random predictions.  Generally you would call this after training.
+     * @param howMany 
+     */
+    public void doPredictions(int howMany) {
+	
+	int numCorrect = 0;
+	for(int i = 0; i < howMany; i++) {
+	    String sentence = sentences.get(Random.uniformInts(1, 0, sentences.size() - 1)[0]);
+	    System.out.println("\n" + sentence);
+	    if(sentence == null) {
+		System.err.println("randomly chosen sentence was null; returning false");
+	    }
+	    List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
+	    String lastWord = words.get(words.size() - 1);
+	    if(lastWord == null) {
+		System.err.println("lastWord was null:  " + sentence + "; return ing false");
+	    }
+
+	    //make a prediction on what the last word is
+	    String prediction = this.makeOnePrediction(words);
+	    System.out.println(prediction);
+	    System.out.println(lastWord.equals(prediction));
+	    if(lastWord.equals(prediction)) {
+		numCorrect++;
+	    }
+	}
+	System.out.println("\nnumber correct was " + numCorrect);
     }
     
     public int doOneBatch() {
 	//make a series of runs making a prediction each time
 	//count the number correct predictions
-	numRunsPerBatch = 100;
 	int numCorrect = 0;
 	for(int i = 0; i < numRunsPerBatch; i++) {
 	    if(this.doOneRun()) {
@@ -380,7 +403,14 @@ public class MCAgent {
 	//ngram prediction
 	//Get the ngram at the lastIndexToUse minus the last word (2, 3, 4 etc. specified by genome)
 	//based on that, find the most likely next work.
-
+	
+	//Check for null here where they are about to be used because they might not have been initiated in the construstor.
+	if(this.ngramsProbDist == null) {
+	    this.ngramsProbDist = this.ngrams.computeProbDist();
+	}
+	if(this.wordProbDist == null) {
+	    this.wordProbDist = this.totalAllWordHist.computeProbDist();
+	}
 	ProbDist<String> associations = this.getWordAssociationScores(sentence);
 	List<ProbDist<String>> dists = new ArrayList<>();
 	dists.add(this.getNgramPredictionProbDist(sentence));
@@ -541,10 +571,10 @@ public class MCAgent {
 	    this.genome = this.generateRandomGenome();
 	} else {
 	    rand = Math.random();
-	    index = (int)(rand * (double)this.genome.length);
+	    index = (int)(rand * (double)3);
 	    double newValue = Random.getUniformDoubles(1, 0.0, 5.0)[0];
 	    this.genome[index] = newValue;
-	    System.out.println(index + " " + newValue);
+	    //System.out.println(index + " " + newValue);
 	}
 	return this.genome;
     }

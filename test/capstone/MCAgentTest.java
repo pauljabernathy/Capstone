@@ -79,10 +79,15 @@ public class MCAgentTest {
 		//logger.info("\noncePerSentence");
 		//oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
 
-		instance = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
-		instance.setTotalNonStopWordHist(totalNonStopWordHist);
-		instance.setOncePerSentenceWordHist(oncePerSentenceWordHist);
-		instance.setBinaryMatrix(binaryMatrix);
+		//MCAgent(List<String> sentences, TreeHistogram<String> totalAllWordHist, TreeHistogram<String> totalNonStopWordHist, TreeHistogram<String> oncePerSentenceWordHist, 
+	//TreeHistogram<String> ngrams, WordMatrix weightedMatrix, WordMatrix binaryMatrix) {
+		//instance = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
+		instance = new MCAgent(sentences);
+		instance.setTotalAllWordHist(totalAllWordHist)
+		.setTotalNonStopWordHist(totalNonStopWordHist)    
+		.setOncePerSentenceWordHist(oncePerSentenceWordHist)
+		.setNgrams(ngrams).setWeightedMatrix(matrix)
+		.setBinaryMatrix(binaryMatrix);
 		sentences.stream().forEach(s -> {
 		    if(s.contains(" win ")) {
 			System.out.println("\n-" + s);
@@ -108,17 +113,18 @@ public class MCAgentTest {
     @After
     public void tearDown() {
     }
-
-    //@Test
-    public void testDoOneRunDemo() {
-	logger.info("testing doOneRunDemo");
-	instance.doOneRunDemo();
-    }
     
     @Test
     public void testRun() {
 	logger.info("running run()");
 	instance.run();
+    }
+    
+    @Test
+    public void testDoPredictions() {
+	logger.info("\ndoPredictions");
+	instance.setGenome(new double[] { 1.150221459310199, 2.853131659824399, 0.08473017271422967, 4.3904694260382735, 4.444581619967423, 0.5530100314467706, 1.142990210003586, 3.839286815451411 });
+	instance.doPredictions(100);
     }
     
     @Test
@@ -363,7 +369,7 @@ public class MCAgentTest {
     @Test
     public void testMutateGenome() {
 	logger.info("\ntesting mutateGenome()");
-	/*double rand = Math.random();
+	/**double rand = Math.random();
 	int index = 0;
 	logger.debug(rand);
 	for(int i = 0; i < 50; i++) {
@@ -373,10 +379,10 @@ public class MCAgentTest {
 	    } else {
 		rand = Math.random();
 		logger.debug(rand);
-		index = (int)(rand * (double)instance.getGenome().length);
+		index = (int)(rand * (double)3);
 		logger.debug(index);
 	    }
-	}*/
+	}/**/
 	double[] genome = instance.getGenome().clone();
 	//logger.debug(ListArrayUtil.arrayToString(genome));
 	double[] result = instance.mutateGenome();

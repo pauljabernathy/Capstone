@@ -9,9 +9,13 @@ package capstone;
 import static capstone.Capstone.DEFAULT_BREAKS_BETWEEN_WORDS;
 import static capstone.Capstone.findWordMatrix;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import static java.util.stream.Collectors.toList;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.Logger;
 import toolbox.stats.HistogramEntry;
 import toolbox.stats.TreeHistogram;
 
@@ -21,71 +25,106 @@ import toolbox.stats.TreeHistogram;
  */
 public class Wanderer {
     
+    private Logger logger;
+    
     public static void main(String[] args) {
-	Date start = new Date();
-	System.out.println();
-	/*try {
-	    WordMatrix matrix = Capstone.findWordMatrixFromFile("through_the_looking_glass.txt");
-	    System.out.println(matrix.getAllAssociationsFor("knight"));
-	    System.out.println(matrix.getAllAssociationsFor("looking"));
-	    System.out.println(matrix.getAllAssociationsFor("glass"));
-	} catch(IOException e) {
-	    System.err.println(e.getClass() + " trying to get the WordMatrix:  " + e.getMessage());
-	}
-	System.out.println("got the word matrix?");*/
+	Wanderer w = new Wanderer();
+	w.run();
+    }
+    
+    public Wanderer() {
+	this.logger = toolbox.util.ListArrayUtil.getLogger(Wanderer.class, Level.DEBUG);
+    }
+    
+    public void run() {
+	Calendar start = Calendar.getInstance();
+	logger.info(start.getTime());
+	String filename = "beowulf i to xxii.txt";
+	filename = "les_miserables.txt";
+	List<MCAgent> agents = this.instantiateAgents(filename, 10);
+	Calendar endInstantiation = Calendar.getInstance();
+	logger.info(endInstantiation.getTime());
+	logger.info(endInstantiation.getTimeInMillis() - start.getTimeInMillis());
 	
+	List<Thread> threads = this.instantiateThreads(agents);
+	threads.forEach(thread -> thread.start());
+	/**/while(this.anyStillRunning(threads)) {
+	    //wait
+	}/**/
+	//agents.get(0).run();
+	Calendar end = Calendar.getInstance();
+	logger.info(end.getTime());
+	logger.info((end.getTimeInMillis() - endInstantiation.getTimeInMillis()) / 1000);
+	
+	agents.forEach(agent -> agent.getLatestRatioCorrect());
+	
+    }
+    
+    protected List<MCAgent> instantiateAgents(String filename, int numAgents) {
+	List<MCAgent> agents = new ArrayList<>();
 	try {
-	    String filename = "les_miserables.txt";
-	    filename = "through_the_looking_glass.txt";
-	    /*WordMatrix matrix = Capstone.findWordMatrixFromFile(filename);
-	    //System.out.println(matrix.getAllAssociationsFor("cosette"));
-	    //System.out.println(matrix.getAllAssociationsFor("jean"));
-	    matrix.getTopAssociationsFor("cosette", 5).stream().forEach(a -> System.out.println(a));
-	    matrix.getTopAssociationsFor("cosette", 5).stream().forEach(a -> System.out.println(a.toStringExclude("cosette")));
-	    matrix.getTopAssociationsFor("jean", 5).stream().forEach(a -> System.out.println(a));
-	    matrix.getTopAssociationsFor("jean", 5).stream().forEach(a -> System.out.println(a.toStringExclude("jean")));*/
-	    
+	    //TODO:  Refactor Capstone to be able to make a word histogram from the sentences list, to cut down on how many times it has to read the file.
+	    Request request = new Request(filename).setRemoveStopWords(true);
 	    List<String> sentences = Capstone.readSentencesFromFile(filename);
-	    List<String> sampleSentences = toolbox.random.Random.sample(sentences, 2, true);
-	    sampleSentences.forEach(System.out::println);
-	    
-	    TreeHistogram<String> ngrams = NGrams.readNGramsFromFile(filename);
-	    
-	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request("").setRemoveStopWords(true));
-	    
-	    for(String sentence : sampleSentences) {
-		System.out.println();
-		String[] words = sentence.split(" ");
-		if(words.length < 4) {
-		    continue;
-		}
-		//List<String> tokens = Capstone.tokenize(sentence, new Request(null).setRemoveStopWords(true));
-		//String[] words = tokens.toArray(new String[] {});
-		int n = words.length;
-		String threeGram = words[n - 4] + " " + words[n - 3] + " " + words[n - 2];
-		//System.out.println(threeGram);
-		String twoGram = words[n - 3] + " " + words[n - 2];
-		System.out.println(twoGram);
-		String toPredict = words[n - 1];
-		List<HistogramEntry<String>> matches = ngrams.queryAll(ng -> ng.startsWith(twoGram));
-		matches.forEach(m -> System.out.println("\t" + m));
+	    TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);	//TODO:  have the MCAgent compute this based on it's object variable, which should be specified in the genome
+	    String ngram = "while he";
+	    List<String> matchingNGrams = ngrams.queryFromFirst(word -> word.startsWith(ngram));
+	    List<HistogramEntry<String>> m = ngrams.queryAll(word -> word.startsWith(ngram));
+	    logger.debug(ngrams.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).collect(toList()));
+	    logger.debug("\n" + matchingNGrams);
+	    logger.debug("\n" + m);
+
+	    WordMatrix matrix = Capstone.findWordMatrixFromSentenceList(sentences, request);
+	    WordMatrix binaryMatrix = Capstone.findWordMatrixFromSentenceList(sentences, new Request(filename).setRemoveStopWords(true).setBinaryAssociationsOnly(true));
+
+	    TreeHistogram<String> totalAllWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(false));
+	    //logger.info("\ntotalAllWordHist");
+	    //totalAllWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    TreeHistogram<String> totalNonStopWordHist = Capstone.fileSummaryTreeHistogram(request.setRemoveStopWords(true).setBinaryAssociationsOnly(true));
+	    //logger.info("\ntotalNonStopWordHist");
+	    //totalNonStopWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+	    TreeHistogram<String> oncePerSentenceWordHist = Capstone.fileSummaryTreeHistogram(request.setBinaryAssociationsOnly(true));
+	    //logger.info("\noncePerSentence");
+	    //oncePerSentenceWordHist.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).forEach(System.out::println);
+
+	    for(int i = 0; i < numAgents; i++) {
+		//public MCAgent(List<String> sentences, TreeHistogram<String> totalAllWordHist, TreeHistogram<String> totalNonStopWordHist, TreeHistogram<String> oncePerSentenceWordHist, 
+	//TreeHistogram<String> ngrams, WordMatrix weightedMatrix, WordMatrix binaryMatrix) {
+		/*MCAgent agent = new MCAgent(totalAllWordHist, sentences, ngrams, matrix);
+		agent.setTotalNonStopWordHist(totalNonStopWordHist);
+		agent.setOncePerSentenceWordHist(oncePerSentenceWordHist);
+		agent.setBinaryMatrix(binaryMatrix);*/
 		
-		//tokenizing this separately because here we want to remove stop words and we do not want to on the ngrams
-		List<String> tokens = Capstone.tokenize(sentence, new Request(null).setRemoveStopWords(true));
-		WordMatrix matrixOfSentence = Capstone.findWordMatrix(tokens.toArray(new String[] {}));
-		for(String token: tokens) {
-		    System.out.println(token);
-		    System.out.println(matrixOfSentence.getAllAssociationsFor(token));
-		}
+		MCAgent agent = new MCAgent(sentences);
+		agent.setTotalAllWordHist(totalAllWordHist)
+		    .setTotalNonStopWordHist(totalNonStopWordHist)    
+		    .setOncePerSentenceWordHist(oncePerSentenceWordHist)
+		    .setNgrams(ngrams)
+		    .setWeightedMatrix(matrix)
+		    .setBinaryMatrix(binaryMatrix)
+		    .setNumBatches(100)
+		    .setNumRunsPerBatch(20)
+		    .setName("Agent" + i);
+
+		agents.add(agent);
 	    }
 	} catch(IOException e) {
-	    System.err.println(e.getClass() + " trying to get the WordMatrix:  " + e.getMessage());
-	} catch(Exception e) {
-	    System.err.println(e.getClass() + " trying to get the WordMatrix:  " + e.getMessage());
+	    System.err.println(e.getClass() + " " + e.getMessage());
 	}
-	
-	Date end = new Date();
-	System.out.println(end.getTime() - start.getTime());
+	return agents;
+    }
+    
+    public List<Thread> instantiateThreads(List<MCAgent> agents) {
+	List<Thread> threads = new ArrayList<>();
+	agents.forEach(agent -> threads.add(new Thread(agent)));
+	return threads;
+    }
+    
+    public boolean anyStillRunning(List<Thread> threads) {
+	if (threads.stream().anyMatch((thread) -> (thread.isAlive()))) {
+	    return true;
+	}
+	return false;
     }
     
 }

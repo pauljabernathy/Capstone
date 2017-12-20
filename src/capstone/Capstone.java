@@ -34,7 +34,6 @@ import toolbox.util.ListArrayUtil;
  */
 public class Capstone {
     
-    public static String[] DEFAULT_TO_REMOVE_WHEN_READING = { "\\.", ":", "\\-", "\n", ",", };
     //line = line.toLowerCase().trim().replaceAll("\\.", "").replaceAll(":", "").replaceAll("\\-", "").replaceAll("\n", " ")
     //.replaceAll(",", "").replaceAll("\"", "");
     public static final Map<String, String> DEFAULT_PREPROCESS_REPLACEMENTS;
@@ -44,7 +43,7 @@ public class Capstone {
     //TODO:  use regex for replacements, so you can do things like remove ' at the start and end but not in the middle of the word
     static {
 	DEFAULT_PREPROCESS_REPLACEMENTS = new HashMap<>();
-	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\.", "");
+	//DEFAULT_PREPROCESS_REPLACEMENTS.put("\\.", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put(":", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\-", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\n", " ");
@@ -56,7 +55,7 @@ public class Capstone {
 	DEFAULT_BREAKS_BETWEEN_WORDS = new ArrayList<>();
 	DEFAULT_BREAKS_BETWEEN_WORDS.add(" ");
 	
-	DEFAULT_SENTENCE_BREAKS = Arrays.asList(".", "!", "?");
+	DEFAULT_SENTENCE_BREAKS = Arrays.asList(".", "\\!", "?");
 	
     }
     public static List<String> readLinesFromFile(String filename) throws IOException {
