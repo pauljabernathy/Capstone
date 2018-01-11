@@ -41,7 +41,7 @@ public class Wanderer {
 	logger.info(start.getTime());
 	String filename = "beowulf i to xxii.txt";
 	filename = "les_miserables.txt";
-	List<MCAgent> agents = this.instantiateAgents(filename, 10);
+	List<MCAgent> agents = this.instantiateAgents(filename, 2);
 	Calendar endInstantiation = Calendar.getInstance();
 	logger.info(endInstantiation.getTime());
 	logger.info(endInstantiation.getTimeInMillis() - start.getTimeInMillis());
@@ -102,10 +102,10 @@ public class Wanderer {
 		    .setNgrams(ngrams)
 		    .setWeightedMatrix(matrix)
 		    .setBinaryMatrix(binaryMatrix)
-		    .setNumBatches(100)
+		    .setNumBatches(10)
 		    .setNumRunsPerBatch(20)
 		    .setName("Agent" + i);
-
+		agent.setGenome(new double[] { 1.150221459310199, 2.853131659824399, 0.08473017271422967, 4.3904694260382735, 4.444581619967423, 0.5530100314467706, 1.142990210003586, 3.839286815451411 });
 		agents.add(agent);
 	    }
 	} catch(IOException e) {

@@ -7,8 +7,10 @@
 package capstone;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.List;
 import static java.util.stream.Collectors.toList;
 import org.apache.logging.log4j.*;
@@ -41,6 +43,7 @@ public class MCAgentTest {
     private static WordMatrix binaryMatrix;
     
     private double EPSILON = 0.0001;
+    private static SimpleDateFormat format;
     
     public MCAgentTest() {
     }
@@ -49,15 +52,19 @@ public class MCAgentTest {
     public static void setUpClass() {
 	logger = toolbox.util.ListArrayUtil.getLogger(MCAgentTest.class, Level.INFO);
 	
+	format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	String filename = "les_miserables.txt";
-	filename = "through_the_looking_glass.txt";
-	filename = "beowulf i to xxii.txt";
+	//filename = "through_the_looking_glass.txt";
+	//filename = "beowulf i to xxii.txt";
+	filename = "blogsSample_1percent.txt";
 	//TODO: use a small test file with known stats
 	if(instance == null) {
 	    try {
 		//TODO:  Refactor Capstone to be able to make a word histogram from the sentences list, to cut down on how many times it has to read the file.
 		Request request = new Request(filename).setRemoveStopWords(true);
 		List<String> sentences = Capstone.readSentencesFromFile(filename);
+		sentences = sentences.stream().map(s -> s.replaceAll("\\[", "")).collect(toList());
+		sentences = sentences.stream().map(s -> s.replaceAll("\\]", "")).collect(toList());
 		TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);	//TODO:  have the MCAgent compute this based on it's object variable, which should be specified in the genome
 		String ngram = "while he";
 		List<String> matchingNGrams = ngrams.queryFromFirst(word -> word.startsWith(ngram));
@@ -114,7 +121,7 @@ public class MCAgentTest {
     public void tearDown() {
     }
     
-    @Test
+    //@Test
     public void testRun() {
 	logger.info("running run()");
 	instance.run();
@@ -123,11 +130,16 @@ public class MCAgentTest {
     @Test
     public void testDoPredictions() {
 	logger.info("\ndoPredictions");
+	Calendar start = Calendar.getInstance();
 	instance.setGenome(new double[] { 1.150221459310199, 2.853131659824399, 0.08473017271422967, 4.3904694260382735, 4.444581619967423, 0.5530100314467706, 1.142990210003586, 3.839286815451411 });
-	instance.doPredictions(100);
+	instance.doPredictions(10);
+	Calendar end = Calendar.getInstance();
+	logger.info(format.format(start.getTime()));
+	logger.info(format.format(end.getTime()));
+	logger.info(end.getTimeInMillis() - start.getTimeInMillis());
     }
     
-    @Test
+    //@Test
     public void testDoOneRun() {
 	logger.info("\ntesting doOneRun()");
 	int numCorrect = 0;
@@ -150,6 +162,10 @@ public class MCAgentTest {
 	String result = instance.makeOnePrediction(text);
 	logger.debug(result);
 	
+	List<String> words = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));
+	words.remove(words.size() - 1);
+	logger.debug("with list, prediction " + instance.makeOnePrediction(words));
+	
 	//logger.debug("\n" + this.makeOnePredictionOneSentence(text));
 	
 	try {
@@ -168,8 +184,9 @@ public class MCAgentTest {
 	String lastWord = words.get(words.size() - 1);
 	logger.debug("word to predict is " + lastWord + "\n");
 	String current = null;
-	for(int i = 0; i < 50; i++) {
+	for(int i = 0; i < 1; i++) {
 	    current = instance.makeOnePrediction(sentence);
+	    logger.debug("prediction = " + current);
 	    //logger.debug(current + " " + ListArrayUtil.arrayToString(instance.getGenome()));
 	    //numCorrect = lastWord.equals(current) ? numCorrect++ : numCorrect;
 	    if(lastWord.equals(current)) {
@@ -186,7 +203,7 @@ public class MCAgentTest {
 	logger.info("\ntesting doNGramPrediction()");
 	String text = "I will win Hrothgar said to the";
 	text = "Healfdene the high, and long while he held it";
-	text = "Mickle wrack was it soothly for the friend of the Scyldings";
+	text = "Mickle wrack was it soothly for the friend of the";
 	List<String> sentence = Capstone.tokenize(text, new Request("").setRemoveStopWords(false));
 	ProbDist<String> result = null;
 	result = instance.getNgramPredictionProbDist(sentence);
@@ -427,10 +444,11 @@ public class MCAgentTest {
 	
 	
 	sentence = Capstone.tokenize("I will win Hrothgar said to the", new Request("").setRemoveStopWords(false));
-	assertEquals("hrothgar said to", instance.constructNgram(sentence, 3));
+	assertEquals("said to the", instance.constructNgram(sentence, 3));
 	logger.debug(sentence);
     }
     
+    //TODO:  move this functionality to ProbDist
     @Test
     public void testCombineProbDists() {
 	logger.info("\ntesting combineProbDists()");

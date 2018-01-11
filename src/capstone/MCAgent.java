@@ -333,10 +333,12 @@ public class MCAgent implements Runnable {
 	    if(lastWord == null) {
 		System.err.println("lastWord was null:  " + sentence + "; return ing false");
 	    }
-
+	    System.out.println("last word = " + lastWord);
+	    words.remove(words.size() - 1);
+	    
 	    //make a prediction on what the last word is
 	    String prediction = this.makeOnePrediction(words);
-	    System.out.println(prediction);
+	    System.out.println("prediction = " + prediction);
 	    System.out.println(lastWord.equals(prediction));
 	    if(lastWord.equals(prediction)) {
 		numCorrect++;
@@ -375,6 +377,8 @@ public class MCAgent implements Runnable {
 	}
 	
 	//make a prediction on what the last word is
+	words.remove(words.size() - 1);	    //The input to makeOnePrediction no longer includes the last word, which is to be predicted.
+	//TODO:  length check
 	String prediction = this.makeOnePrediction(words);
 	
 	//return if it was correct or not
@@ -385,6 +389,11 @@ public class MCAgent implements Runnable {
 	return prediction.equals(lastWord);
     }
     
+    /**
+     * 
+     * @param sentence, not including the last word
+     * @return 
+     */
     public String makeOnePrediction(String sentence) {
 	
 	//Token the sentence.  Should we remove the stop words here?  Should that be part of the genome?
@@ -392,10 +401,16 @@ public class MCAgent implements Runnable {
 	//Maybe tokenize twice - once for the ngrams and another for the associations.
 	
 	List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
-	//String lastWord = words.get(words.size() - 1);
+	//TODO:  length check
+	words.remove(words.size() - 1);
 	return this.makeOnePrediction(words);
     }
     
+    /**
+     * 
+     * @param sentence
+     * @return 
+     */
     public String makeOnePrediction(List<String> sentence) {
 	//System.out.println("makeOnePrediction(" + sentence + ")");
 	//From the sentence in it, try to predict the last word.
@@ -411,15 +426,20 @@ public class MCAgent implements Runnable {
 	if(this.wordProbDist == null) {
 	    this.wordProbDist = this.totalAllWordHist.computeProbDist();
 	}
-	ProbDist<String> associations = this.getWordAssociationScores(sentence);
-	List<ProbDist<String>> dists = new ArrayList<>();
-	dists.add(this.getNgramPredictionProbDist(sentence));
-	dists.add(associations);
-	dists.add(this.wordProbDist);
-	ProbDist<String> totalProbDist = this.combineProbDists(dists);
-	//System.out.println(totalProbDist);
-	
-	return totalProbDist.getValue(0);   //TODO:  some sort of error checking
+	try {
+	    ProbDist<String> associations = this.getWordAssociationScores(sentence);
+	    List<ProbDist<String>> dists = new ArrayList<>();
+	    dists.add(this.getNgramPredictionProbDist(sentence));
+	    dists.add(associations);
+	    /**/ //**/dists.add(this.wordProbDist);
+	    ProbDist<String> totalProbDist = this.combineProbDists(dists);
+	    //System.out.println(totalProbDist);
+
+	    return totalProbDist.getValue(0);   //TODO:  some sort of error checking
+	} catch(Exception e) {
+	    System.err.println(e.getClass() + " for sentence " + sentence + ":  " + e.getMessage());
+	    return MCAgent.UNKNOWN;
+	}
     }
     
     public ProbDist<String> getNgramPredictionProbDist(List<String> sentence) {
@@ -431,9 +451,27 @@ public class MCAgent implements Runnable {
 	String ngram = this.constructNgram(sentence, 2);
 	//System.out.println(ngram);
 	Predicate<String> p = word -> word.startsWith(ngram);
+	if(this.ngramsProbDist == null) {
+	    this.ngramsProbDist = this.ngrams.computeProbDist();
+	}
 	ProbDist<String> probsGiven = this.ngramsProbDist.given(p);
-	probsGiven.setValues(probsGiven.getValues().stream().map(word -> word.replaceAll(ngram, "").trim()).collect(toList()));
+	if(probsGiven == null) {
+	    System.out.println("probsGiven was null");
+	}
+	//System.out.println("matching ngrams are:");
+	//probsGiven.getValues().stream().forEach(System.out::println);
+	//Extract just the last word of the ngram, so we return the predicted words and not the entire ngrams.
+	probsGiven.setValues(probsGiven.getValues().stream().parallel().map(word -> this.mapWord(ngram, word)).collect(toList()));  //parallel
 	return probsGiven;
+    }
+    
+    private String mapWord(String ngram, String word) {
+	if(word != null) {
+	    word = word.replaceAll(ngram, "").trim();
+	} else {
+	    word = "UNKNOWN";
+	}
+	return word; 
     }
     
     public ProbDist<String> getNGramProbDist() {
@@ -454,14 +492,13 @@ public class MCAgent implements Runnable {
     }
     
     public ProbDist<String> getWordAssociationScores(List<String> sentence) {
-	sentence = sentence.stream().distinct().collect(toList());
+	sentence = sentence.stream().distinct().collect(toList());  //distinct => can't do parallel
 	//System.out.println(sentence);
 	//for each word in the sentence
 	//For each association, use probAInSentenceWithB to find the prob of each word the given word is in a sentence with.
 	//This gives a probability distribution.
 	//After all dists have been determined, try Naive Bayes (yes, it's very naive, but may work OK)
 	Map<String, ProbDist> dists = new HashMap<>();
-	Set<String> associatedWords = new HashSet<>();   //to keep track of words that are associated with any word in this sentence and could be candiates for the predicted word; will hold just a small portion of the total words
 	Map<String, Double> scores = new HashMap<>();
 	WeightedBinaryTree<String> scoresTree = new WeightedBinaryTree<>(UNKNOWN, 1);	//TODO: stop this as soon as the defect with the WBT constructor is fixed
 	for(String word : sentence) {
@@ -472,7 +509,6 @@ public class MCAgent implements Runnable {
 		String other = wpa.getOther(word).get();
 		//double prob = (double)wpa.getCount() / (double)this.getOncePerSentenceWordHist().get(word).get().count;
 		double probWithBeta = this.probAInSentenceGivenB(wpa.getOther(word).get(), word);
-		associatedWords.add(wpa.getOther(word).get());
 		if(scores.containsKey(other)) {
 		    scores.put(other, scores.get(other) + probWithBeta);
 		} else {
@@ -485,7 +521,7 @@ public class MCAgent implements Runnable {
 	List<WeightedBinaryTree<String>> orderedScores = scoresTree.getAsList(WeightedBinaryTree.SortType.WEIGHT).stream().filter(t -> !t.getKey().equals(UNKNOWN)).collect(toList());
 	double totalWeight = scoresTree.getTreeWeight();
 	ProbDist<String> scoresProbs = new ProbDist<>();
-	orderedScores.stream().forEach(t -> {
+	orderedScores.stream().forEach(t -> {	
 	    scoresProbs.add(t.getKey(), t.getWeight() / totalWeight);
 	});/**/
 	
@@ -580,7 +616,7 @@ public class MCAgent implements Runnable {
     }
     
     protected String constructNgram(List<String> sentence, int length) {
-	return this.constructNgram(sentence, length, 1);
+	return this.constructNgram(sentence, length, 0);
     }
     
     protected String constructNgram(List<String> sentence, int length, int numToLeaveOff) {
@@ -628,11 +664,11 @@ public class MCAgent implements Runnable {
 		if(word == null) {
 		    continue;
 		}
-		if(resultMap.keySet().contains(word)) {
+		/**if(resultMap.keySet().contains(word)) {
 		    resultMap.put(word, resultMap.get(word) + probs.get(currentProbIndex) * weight);
 		} else {
 		    resultMap.put(word, probs.get(currentProbIndex) * weight);
-		}
+		}/**/
 		t.insert(word, probs.get(currentProbIndex) * weight, DuplicateEntryOption.UPDATE);
 	    }
 	}

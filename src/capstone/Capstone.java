@@ -50,6 +50,8 @@ public class Capstone {
 	DEFAULT_PREPROCESS_REPLACEMENTS.put(",", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("\"", "");
 	DEFAULT_PREPROCESS_REPLACEMENTS.put("!", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\[", "");
+	DEFAULT_PREPROCESS_REPLACEMENTS.put("\\]", "");
 	//DEFAULT_PREPROCESS_REPLACEMENTS.put("", "");
     
 	DEFAULT_BREAKS_BETWEEN_WORDS = new ArrayList<>();
@@ -95,6 +97,12 @@ public class Capstone {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         while(reader.ready()) {
             currentLine = reader.readLine();
+	    //TODO: unit test
+	    if(currentLine != null) {
+		for(String key : request.getReplacements().keySet()) {
+		    currentLine.replaceAll(key, request.getReplacements().get(key));
+		}
+	    }
             currentSentences = Capstone.tokenize(currentLine, request.setWordBreaks(DEFAULT_SENTENCE_BREAKS));	//a hack to tell it to tokenize based on the sentence breaks
 	    //TODO:  a better long term solution than the above hack
             if(currentSentences.size() == 0) {
