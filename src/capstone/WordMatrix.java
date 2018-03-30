@@ -99,7 +99,7 @@ public class WordMatrix {
 	    map = new HashMap<>();
 	}
 	if(!map.containsKey(a)) {
-	    map.put(a, new HashMap<String, Integer>());
+	    map.put(a, new HashMap<>());
 	}
 	Map<String, Integer> aMap = map.get(a);
 	if(!aMap.containsKey(b)){

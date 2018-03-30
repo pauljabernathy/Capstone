@@ -29,7 +29,12 @@ public class Wanderer {
     
     public static void main(String[] args) {
 	Wanderer w = new Wanderer();
-	w.run();
+	//w.run();
+	System.out.println("Wanderer::main");
+	/*for(String arg : args) {
+	    System.out.println(arg);
+	}*/
+	System.out.println("hello world");
     }
     
     public Wanderer() {
@@ -37,11 +42,15 @@ public class Wanderer {
     }
     
     public void run() {
-	Calendar start = Calendar.getInstance();
-	logger.info(start.getTime());
 	String filename = "beowulf i to xxii.txt";
 	filename = "les_miserables.txt";
-	List<MCAgent> agents = this.instantiateAgents(filename, 2);
+	this.run(filename, 2);
+    }
+    
+    public void run(String filename, int numAgents) {
+	Calendar start = Calendar.getInstance();
+	logger.info(start.getTime());
+	List<MCAgent> agents = this.instantiateAgents(filename, numAgents);
 	Calendar endInstantiation = Calendar.getInstance();
 	logger.info(endInstantiation.getTime());
 	logger.info(endInstantiation.getTimeInMillis() - start.getTimeInMillis());

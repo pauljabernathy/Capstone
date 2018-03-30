@@ -6,6 +6,7 @@
 
 package capstone;
 
+import capstone.*;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -226,6 +227,7 @@ public class MCAgentApp {
     }
     
     public static void main(String[] args) {
+	MCAgentApp.setUpClass();
 	MCAgentApp m = new MCAgentApp();
 	m.doPredictionsQuiz2();
     }
