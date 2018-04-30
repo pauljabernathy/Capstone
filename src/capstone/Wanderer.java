@@ -41,6 +41,15 @@ public class Wanderer {
 	this.logger = toolbox.util.ListArrayUtil.getLogger(Wanderer.class, Level.DEBUG);
     }
     
+    public Logger getLogger() {
+	return this.logger;
+    }
+    
+    public Wanderer setLogger(Logger logger) {
+	this.logger = logger;
+	return this;
+    }
+    
     public void run() {
 	String filename = "beowulf i to xxii.txt";
 	filename = "les_miserables.txt";
@@ -76,7 +85,7 @@ public class Wanderer {
 	    Request request = new Request(filename).setRemoveStopWords(true);
 	    List<String> sentences = Capstone.readSentencesFromFile(filename);
 	    TreeHistogram<String> ngrams = NGrams.getNGramsOfSentences(sentences, 3);	//TODO:  have the MCAgent compute this based on it's object variable, which should be specified in the genome
-	    String ngram = "while he";
+	    String ngram = "whie he";
 	    List<String> matchingNGrams = ngrams.queryFromFirst(word -> word.startsWith(ngram));
 	    List<HistogramEntry<String>> m = ngrams.queryAll(word -> word.startsWith(ngram));
 	    logger.debug(ngrams.getAsList(TreeHistogram.Sort.COUNT).stream().limit(50).collect(toList()));

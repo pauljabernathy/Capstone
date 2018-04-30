@@ -42,8 +42,20 @@ public class MCAgentApp {
     
     private static SimpleDateFormat format;
     
+    public static final String BEOWULF_FILE = "beowulf i to xxii.txt";
+    public static final String LOOKING_GLASS_FILE = "through_the_looking_glass.txt";
+    public static final String LES_MIS_FILE = "les_miserables.txt";
+    public static final String BLOGS_SAMPLE_1_FILE = "blogsSample1.txt";
+    
+    public static final String BEOWULF_ARG = "beowulf";
+    public static final String LOOKING_GLASS_ARG = "alice";
+    public static final String LES_MIS_ARG = "les_mis";
+    public static final String BLOGS_SAMPLE_1_ARG = "blogs1";
+    
+    
     @BeforeClass
     public static void setUpClass() {
+	System.setProperty("log4j.configurationFile", "log4j2.xml");
 	logger = toolbox.util.ListArrayUtil.getLogger(MCAgentApp.class, Level.INFO);
 	format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	Calendar start = Calendar.getInstance();
@@ -144,7 +156,8 @@ public class MCAgentApp {
 	    .setTotalNonStopWordHist(totalNonStopWordHist)    
 	    .setOncePerSentenceWordHist(oncePerSentenceWordHist)
 	    .setNgrams(ngrams).setWeightedMatrix(matrix)
-	    .setBinaryMatrix(binaryMatrix);
+	    .setBinaryMatrix(binaryMatrix)
+	    .setLogger(LogManager.getLogger("MCAgent logger"));
 
 	    //logger.debug(instance.getNGramProbDist());
 	    Calendar end = Calendar.getInstance();
@@ -156,6 +169,21 @@ public class MCAgentApp {
 	    System.err.println(e.getClass() + " " + e.getMessage());
 	    return new MCAgent(null);
 	}
+    }
+    
+    public void doPredictionsNoMC(String filename) {
+	logger.info("\ndoPredictionsNoMC(" + filename + ")");
+	instance = this.instantiateAgent(filename);
+	instance.setGenome(new double[] { 1.150221459310199, 2.853131659824399, 0.08473017271422967, 4.3904694260382735, 4.444581619967423, 0.5530100314467706, 1.142990210003586, 3.839286815451411 });
+	instance.doPredictions(10);
+    }
+    
+    @Test
+    public void doPredictionsOnBeowulfNoMC() {
+	logger.info("\ndoPredictionsNoMC()");
+	instance = this.instantiateAgent("beowulf i to xxii.txt");
+	instance.setGenome(new double[] { 1.150221459310199, 2.853131659824399, 0.08473017271422967, 4.3904694260382735, 4.444581619967423, 0.5530100314467706, 1.142990210003586, 3.839286815451411 });
+	instance.doPredictions(10);
     }
     
     @Test
@@ -198,15 +226,15 @@ public class MCAgentApp {
 	instance.setGenome(new double[] { 1.541870530631559, 2.853131659824399, 4.4919195414649025, 4.3904694260382735, 4.444581619967423, 0.5530100314467706, 1.142990210003586, 3.839286815451411 });
 	List<String> sentences = new ArrayList<>();
 	sentences.add("The guy in front of me just bought a pound of bacon, a bouquet, and a case of");
-	//sentences.add("You're the reason why I smile everyday. Can you follow me please? It would mean the");
-	/*sentences.add("Hey sunshine, can you follow me and make me the");
+	sentences.add("You're the reason why I smile everyday. Can you follow me please? It would mean the");
+	/**/sentences.add("Hey sunshine, can you follow me and make me the");
 	sentences.add("Very early observations on the Bills game: Offense still struggling but the");
 	sentences.add("Go on a romantic date at the");
 	sentences.add("Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my");
 	sentences.add("Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some");
 	sentences.add("After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little");
 	sentences.add("Be grateful for the good times and keep the faith during the");
-	sentences.add("If this isn't the cutest thing you've ever seen, then you must be");*/
+	sentences.add("If this isn't the cutest thing you've ever seen, then you must be");/**/
 	//sentences.add("");
 	//sentences.add("");
 	
@@ -229,6 +257,70 @@ public class MCAgentApp {
     public static void main(String[] args) {
 	MCAgentApp.setUpClass();
 	MCAgentApp m = new MCAgentApp();
-	m.doPredictionsQuiz2();
+	String default_file = BEOWULF_FILE;
+	String filename = default_file;
+	if(args == null || args.length == 0) {
+	    filename = default_file;
+	    m.doPredictionsNoMC(filename);
+	} else if(args != null && args.length > 0) {
+	    if("quiz2".equals(args[0])) {
+		m.doPredictionsQuiz2();
+		return;
+	    } else if("predict".equals(args[0])) {
+		filename = m.getFilename(args);
+		m.doPredictionsNoMC(filename);
+	    } else if("mc".equals(args[0])) {
+		filename = m.getFilename(args);
+		Wanderer w = new Wanderer();
+		w.setLogger(LogManager.getLogger("MCAgent logger"));
+		int numAgents = 2;
+		if(args.length == 3) {
+		    try {
+			numAgents = Integer.parseInt(args[2]);
+		    } catch(NumberFormatException e) {
+			//just leave it at the default
+			System.err.println(e.getClass() + " trying to parse " + args[2] + ":  using default value of " + numAgents);
+		    }
+		}
+		w.run(filename, numAgents);
+	    }
+	}
+	/*if(args != null && args.length == 2 && "predict".equals(args[0])) {
+	    //shortcut for common file names, because "beowulf" is easier to type than "beowulf i to xxii.txt";
+	    if(BEOWULF_ARG.equals(args[1])) { 
+		filename = BEOWULF_FILE;
+	    } else if(LOOKING_GLASS_ARG.equals(args[1])) {
+		filename = LOOKING_GLASS_FILE;
+	    } else if(LES_MIS_ARG.equals(args[1])) {
+		filename = LES_MIS_FILE;
+	    } else if(BLOGS_SAMPLE_1_ARG.equals(args[1])) { 
+		filename = BLOGS_SAMPLE_1_FILE;
+	    } else {
+		filename = args[0];
+	    }
+	} else {
+	    filename = default_file;
+	}
+	m.doPredictionsNoMC(filename);*/
+    }
+    
+    private String getFilename(String[] args) {
+	String default_file = BEOWULF_FILE;
+	String filename = default_file;
+	if(args == null || args.length > 2) {
+	    return filename;
+	}
+	if(BEOWULF_ARG.equals(args[1])) { 
+	    filename = BEOWULF_FILE;
+	} else if(LOOKING_GLASS_ARG.equals(args[1])) {
+	    filename = LOOKING_GLASS_FILE;
+	} else if(LES_MIS_ARG.equals(args[1])) {
+	    filename = LES_MIS_FILE;
+	} else if(BLOGS_SAMPLE_1_ARG.equals(args[1])) { 
+	    filename = BLOGS_SAMPLE_1_FILE;
+	} else {
+	    filename = args[1];
+	}
+	return filename;
     }
 }

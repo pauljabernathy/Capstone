@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import static java.util.stream.Collectors.toList;
+import org.apache.logging.log4j.*;
 import toolbox.random.Random;
 import toolbox.stats.*;
 import toolbox.trees.DuplicateEntryOption;
@@ -71,18 +72,15 @@ public class MCAgent implements Runnable {
     
     private static final String UNKNOWN = "UNKNOWN";
     
+    private Logger logger;   
+    
     public MCAgent(List<String> sentences) {
 	this.sentences = sentences;
 	//sentences is actually the only true information.  The rest can be calculated from it and are only for speed.
 	//The other objects should be passed in because the MCAgentRunner can calculate it all one for all of the agents.
 	//If this constructor is used, the calling code will either need to use the setters or this class will need to call the appropriate methods in Capstone.
 	
-	this.genome = this.generateRandomGenome();
-	this.beta = Constants.DEFAULT_BETA;
-	this.ngramLength = 2;
-	this.numRunsPerBatch = 100;
-	this.numBatches = 40;
-	this.name = UNKNOWN;
+	this.setDefaultParameters();
     }
     
     //TODO: remove - use either the default (with just senteces) or the full
@@ -109,6 +107,16 @@ public class MCAgent implements Runnable {
 	this.binaryMatrix = binaryMatrix;
     }
 
+    public void setDefaultParameters() {
+	this.genome = this.generateRandomGenome();
+	this.beta = Constants.DEFAULT_BETA;
+	this.ngramLength = 2;
+	this.numRunsPerBatch = 100;
+	this.numBatches = 40;
+	this.name = UNKNOWN;
+	this.logger = LogManager.getLogger(this.getClass());
+    }
+    
     public double getBeta() {
 	return beta;
     }
@@ -283,9 +291,19 @@ public class MCAgent implements Runnable {
     public double getLatestRatioCorrect() {
 	return this.latestRatioCorrect;
     }
+
+    public Logger getLogger() {
+	return logger;
+    }
+
+    public MCAgent setLogger(Logger logger) {
+	this.logger = logger;
+	return this;
+    }
+    
     
     public static void main(String[] args) {
-	
+    
     }
     
     public void run() {
@@ -294,11 +312,11 @@ public class MCAgent implements Runnable {
 	double[] bestGenome = this.genome.clone();
 	
 	for(int i = 0; i < numBatches; i++) {
-	    //System.out.println("genome is " + ListArrayUtil.arrayToString(this.genome));
+	    logger.debug("genome is " + ListArrayUtil.arrayToString(this.genome));
 	    currentNumCorrect = this.doOneBatch();
-	    //System.out.println("currentNumCorrect = " + currentNumCorrect);
+	    logger.debug("currentNumCorrect = " + currentNumCorrect);
 	    if(currentNumCorrect > bestNumCorrect) {
-		//System.out.println(ListArrayUtil.arrayToString(this.genome) + " was better than " + ListArrayUtil.arrayToString(bestGenome));
+		logger.info(ListArrayUtil.arrayToString(this.genome) + " was better than " + ListArrayUtil.arrayToString(bestGenome));
 		bestNumCorrect = currentNumCorrect;
 		bestGenome = this.genome.clone();
 	    } else {
@@ -309,7 +327,12 @@ public class MCAgent implements Runnable {
 	}
 	this.genome = bestGenome;
 	this.latestRatioCorrect = (double)bestNumCorrect / (double)this.numRunsPerBatch;
-	System.out.println(this.name + ":  final genome is " + ListArrayUtil.arrayToString(this.genome) + " with " + this.latestRatioCorrect * 100.0 + "% correct");
+	StringBuilder report = new StringBuilder();
+	report.append("\n").append(this.name).append(":  final genome is ").append(ListArrayUtil.arrayToString(this.genome))
+	    .append(" with ").append(this.latestRatioCorrect * 100.0).append("% correct");
+	//logger.info(this.name + ":  final genome is " + ListArrayUtil.arrayToString(this.genome) + " with " + this.latestRatioCorrect * 100.0 + "% correct");
+	logger.info("\n");
+	logger.info(report);
 	
 	//System.out.println("now try a few predictions");
 	//this.doPredictions(100);
@@ -324,9 +347,9 @@ public class MCAgent implements Runnable {
 	int numCorrect = 0;
 	for(int i = 0; i < howMany; i++) {
 	    String sentence = sentences.get(Random.uniformInts(1, 0, sentences.size() - 1)[0]);
-	    System.out.println("\n" + sentence);
+	    logger.debug("\n" + sentence);
 	    if(sentence == null) {
-		System.err.println("randomly chosen sentence was null; returning false");
+		logger.error("randomly chosen sentence was null; returning false");
 	    }
 	    List<String> words = Capstone.tokenize(sentence, new Request("").setRemoveStopWords(false));
 	    String lastWord = words.get(words.size() - 1);
